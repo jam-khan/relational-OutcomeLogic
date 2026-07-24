@@ -72,9 +72,35 @@ the extended abstract's technical section (per Context.MD §7).
   The relational research content is therefore concentrated in falsification
   completeness, not in the proof system.
 
-## Failure-mode catalog (Phase 3.5/3.6 findings)
-- Unary OL (Lemma 5.5) has exactly 3 failure modes; relational n=1 already has 4
-  primitives (left-divergence, right-divergence, bad-pair-reachable; coverage joins at n≥2).
+## Failure-mode catalog (Phase 3.5/3.6 findings — ALL MECHANIZED)
+**This is the main negative/structural finding of the project; all of it is
+kernel-checked in `Metatheory.lean`.**
+
+- **n = 1 is complete** (`not_atom_iff` / `not_atom_enum`): a relational atom fails in
+  exactly one of: left divergence (m = ∅), right divergence (m' = ∅), or a reachable
+  bad pair — and the bad pair is itself a positive RelOL certificate `(atom ¬r) ⊕ ⊤`
+  via *overlapping* splits `m = {x} ∪ m` (`bad_pair_oplus`). Four primitives vs unary
+  OL's three (Lemma 5.5): divergence doubles per side.
+- **The unary "bad state reachable" mode is UNSOUND for n ≥ 2**
+  (`bad_pair_does_not_refute`): a reachable pair satisfying neither relation does not
+  refute `atom r₁ ⊕ atom r₂`, because the split can separate the two outcomes so they
+  are never co-located. This has no unary analogue (unary elements must land in *some*
+  piece and satisfy its predicate; relational pairs can be split apart).
+- **The sound n ≥ 2 generalizations** are: per-side divergence; per-relation joint
+  unreachability (`not_oplus_atoms_of_rel_empty_left/right` — "outcome i never jointly
+  reached"); and the **orphan mode** (`not_oplus_atoms_of_left_orphan`): an element with
+  no partner under *either* relation. The orphan mode has ∃∀ shape and is NOT expressible
+  as an `⊕ ⊤` certificate (the ⊕⊤ form only asserts a sub-rectangle, i.e. ∃∃).
+- **No unary-style enumeration is complete for n ≥ 2** (`enumeration_incomplete`):
+  over `Bool` with `r₁ = (· = ·)`, `r₂ = (· ≠ ·)`, `m = m' = univ`, every mode above is
+  absent yet the spec is unsatisfiable. Reason: satisfaction of `atom r₁ ⊕ atom r₂` is a
+  **rectangle-cover** condition (∃ rectangles A×A' ⊆ r₁, B×B' ⊆ r₂ covering m, m'
+  side-wise), and with r₁ = equality every r₁-rectangle is a diagonal singleton, forcing
+  the complementary r₂-rectangle to contain a reflexive pair. The obstruction is
+  irreducibly global — exactly the "split correlation" failure predicted in Context.MD §6.
+- Abstract framing: *the relational falsifying-assertion problem is not a finite
+  enumeration but a rectangle-cover problem; the unary enumeration (OL Lemma 5.5) is the
+  degenerate 1-rectangle case.*
 
 ## Pinned Mathlib names (v4.32.1)
 (record resolved names here at first use)

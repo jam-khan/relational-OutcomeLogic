@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Rules
+import RelationalOutcomeLogic.Metatheory
 
 /-!
 # Case study 1: noninterference and its certified violation
@@ -72,5 +72,18 @@ theorem not_NI : ¬ NI prog := by
     sem_prog_neg (by simp)] at hpost
   have hL := atom_pair_elim hpost (Set.mem_singleton _) (Set.mem_singleton _)
   simp [L] at hL
+
+/-- The principled route: `insecure` + the relational Principle of Denial refute
+noninterference. The insecurity certificate *is* the disproof — one logic, both
+directions (the contrast with Murray's violation-only logic and with unary OL). -/
+theorem not_NI_via_denial : ¬ NI prog := by
+  intro hNI
+  have hNI' : ⦃preIns⦄ prog ~ prog ⦃atom L⦄ :=
+    quad_conseq (atom_mono fun s s' h => h.1) hNI (fun _ _ h => h)
+  refine denial insecure ?_ ⟨{st 1 0}, {st 0 0}, preIns_sat⟩ hNI'
+  rintro n n' hT hL
+  obtain ⟨t, ht, t', ht', h1, h0⟩ := rel_true_positives hT
+  have heq : t "low" = t' "low" := atom_pair_elim hL ht ht'
+  omega
 
 end RelOL
