@@ -9,3 +9,6 @@ import RelationalOutcomeLogic.Quadruple
 import RelationalOutcomeLogic.Rules
 import RelationalOutcomeLogic.Metatheory
 import RelationalOutcomeLogic.Examples.NI
+import RelationalOutcomeLogic.Hetero.Lang
+import RelationalOutcomeLogic.Hetero.Refinement
+import RelationalOutcomeLogic.Examples.Translation
