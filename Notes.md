@@ -105,6 +105,40 @@ kernel-checked in `Metatheory.lean`.**
 ## Pinned Mathlib names (v4.32.1)
 (record resolved names here at first use)
 
+## Mechanization status (2026-07-24)
+- **All phases complete, whole repo sorry-free** (`scripts/check.sh` green; CI gate active).
+- Axiom check on every showcase theorem: only `propext`, `Classical.choice`, `Quot.sound`
+  (and `denial`, `quadSem_split` depend on **no** axioms at all).
+- ~1,200 LOC (845 nonblank) across 14 files; git tags `phase-0` … `phase-4`.
+- Phase 4 acceptance test PASSED: heterogeneity required **zero changes** to
+  Assertions/Quadruple/Rules — `quadH` is a 2-line instantiation of `quadSem`.
+  The carrier-polymorphism design (D2/D3) fully paid off.
+- Certificate-strength asymmetry realized as predicted: `translation_bug` (⊕⊤ form)
+  is derived from `translation_bug_exhaustive` by `oplus_left_top`, and only the
+  exhaustive form powers `not_refines` (∀∃-shaped spec).
+
+## Abstract outline (2.5–3 pp, structure per Context.MD §8)
+1. **Problem** — under-approximate logics are unary (OL) or IL-shaped (Murray);
+   relational properties need execution pairs; translation validation needs pairs
+   across *different semantics*.
+2. **Quadruple** (half page) — `quadSem`/`atom`/`⊕ₒ` definitions; carrying sentence:
+   *the same quadruple form states the property (no ⊤) and certifies its violation
+   (⊕ ⊤)*; one line on heterogeneity-by-polymorphic-carriers.
+3. **Example 1** — `insecure` + `not_NI_via_denial`; contrast with Murray (backward,
+   violation-only) in one sentence.
+4. **Example 2** — `translation_bug_exhaustive` + `not_refines` + `correct_translation`
+   contrast row; certificate-strength asymmetry (⊕⊤ refutes ∀∀, exhaustive refutes ∀∃).
+5. **Metatheory** — relational falsification (Thm 5.1 analogue); the failure-mode
+   findings: n=1 complete (4 primitives), bad-pair unsound for n≥2, orphan modes,
+   mechanized incompleteness (rectangle-cover obstruction) — the paper's main
+   structural finding.
+6. **Status & roadmap** — mechanized in Lean 4, ~1.2k LOC, sorry-free, standard axioms
+   only; future: coupling model, probabilistic instance (→ DP violations), semiring
+   base (TOPLAS25), syntactic falsification, proof-producing tactic.
+7. **Related work** — OL/TOPLAS25, Murray, HHL (self-composition + explicit
+   multiple-programs-future-work concession), Alive2, rF*/Fuzz; eRHL ⊕ symbol-clash
+   footnote; "no OL mechanization exists" as a contribution claim.
+
 ## Abstract fodder
 - "The same quadruple form states the property (no ⊤) and certifies its violation (⊕ ⊤)."
 - HHL: "extending Hyper Hoare Logic to multiple programs is interesting future work"
