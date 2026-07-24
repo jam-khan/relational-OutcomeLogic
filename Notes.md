@@ -105,6 +105,25 @@ kernel-checked in `Metatheory.lean`.**
 ## Pinned Mathlib names (v4.32.1)
 (record resolved names here at first use)
 
+### D9: Case study 3 — exceptions-to-error-codes lowering (compiler pass)
+- **Decision:** Source `CmdS` (core fragment + `throw`) with state-carrying exceptions,
+  semantics into `Set (Except State State)`; target = the **ite-fragment of the
+  already-mechanized core `Cmd`** (a genuine subset of core, no new target language).
+  `errK` generalized over the error type `ε` (Unit for Rust-like, `State` here) — the
+  generalization touched nothing downstream.
+- Correct pass `lower`: `throw ↦ err := 1`, sequencing guarded by `err = 0`.
+  Buggy pass `lowerBug`: guard dropped — target executes dead code after an exception.
+- Correspondence `lowRel`: `ok t ~ t` (source can't touch `err`, init `err = 0`);
+  `error te ~ update te "err" 1` (throw-point store + flag).
+- Certificates (per-program translation validation, NOT compiler verification):
+  `lower_ok_correct`, `lower_thr_correct` (correct pass validates on both paths);
+  `miscompiled` (exhaustive quadruple: source raises at store with `y = 0`, buggy
+  target ends with `y = 2` — Csmith-style observation as a theorem);
+  `lowerBug_not_correct` via `denial` — the certificate IS the disproof, the same
+  pattern as `not_NI_via_denial` and `not_refines`, now for a third property class.
+- Scoping honesty: correctness is per program/pass pair at a concrete initial store;
+  a `Wf` predicate (source avoids `"err"`) and a ∀-programs simulation are future work.
+
 ## Mechanization status (2026-07-24)
 - **All phases complete, whole repo sorry-free** (`scripts/check.sh` green; CI gate active).
 - Axiom check on every showcase theorem: only `propext`, `Classical.choice`, `Quot.sound`

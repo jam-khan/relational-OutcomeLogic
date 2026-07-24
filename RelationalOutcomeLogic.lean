@@ -12,3 +12,5 @@ import RelationalOutcomeLogic.Examples.NI
 import RelationalOutcomeLogic.Hetero.Lang
 import RelationalOutcomeLogic.Hetero.Refinement
 import RelationalOutcomeLogic.Examples.Translation
+import RelationalOutcomeLogic.Compiler.Lowering
+import RelationalOutcomeLogic.Examples.Compiler

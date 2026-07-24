@@ -89,27 +89,29 @@ theorem semLiftC_nonempty (c : CmdC) {m : Set StC} (hm : m.Nonempty) :
 /-! ## The error-propagating Kleisli step -/
 
 /-- Error-propagating continuation lift (OL Def. 6.3 in the monad-law-consistent
-orientation of Example 6.4): errors propagate verbatim, ok-states continue. -/
-def errK {σ τ : Type*} (k : σ → Set (Except Unit τ)) : Except Unit σ → Set (Except Unit τ)
+orientation of Example 6.4): errors propagate verbatim, ok-states continue.
+Polymorphic in the error type `ε` (the Rust-like side uses `ε := Unit`; the
+compiler case study uses state-carrying exceptions, `ε := State`). -/
+def errK {ε σ τ : Type*} (k : σ → Set (Except ε τ)) : Except ε σ → Set (Except ε τ)
   | .error e => {.error e}
   | .ok s => k s
 
-@[simp] theorem errK_ok {σ τ : Type*} {k : σ → Set (Except Unit τ)} {s : σ} :
+@[simp] theorem errK_ok {ε σ τ : Type*} {k : σ → Set (Except ε τ)} {s : σ} :
     errK k (.ok s) = k s := rfl
 
-@[simp] theorem errK_error {σ τ : Type*} {k : σ → Set (Except Unit τ)} {e : Unit} :
+@[simp] theorem errK_error {ε σ τ : Type*} {k : σ → Set (Except ε τ)} {e : ε} :
     errK k (.error e) = {Except.error e} := rfl
 
-theorem errK_nonempty {σ τ : Type*} {k : σ → Set (Except Unit τ)}
-    (hk : ∀ s, (k s).Nonempty) (a : Except Unit σ) : (errK k a).Nonempty := by
+theorem errK_nonempty {ε σ τ : Type*} {k : σ → Set (Except ε τ)}
+    (hk : ∀ s, (k s).Nonempty) (a : Except ε σ) : (errK k a).Nonempty := by
   cases a with
   | error e => exact ⟨.error e, rfl⟩
   | ok s => exact hk s
 
 /-- **Regression lemma for the Def. 6.3 orientation**: the error-propagating
 bind is associative. With the printed (swapped) case-split this is false. -/
-theorem errK_assoc {σ τ υ : Type*} (k₁ : σ → Set (Except Unit τ))
-    (k₂ : τ → Set (Except Unit υ)) (m : Set (Except Unit σ)) :
+theorem errK_assoc {ε σ τ υ : Type*} (k₁ : σ → Set (Except ε τ))
+    (k₂ : τ → Set (Except ε υ)) (m : Set (Except ε σ)) :
     kleisli (errK k₂) (kleisli (errK k₁) m)
       = kleisli (errK fun s => kleisli (errK k₂) (k₁ s)) m := by
   rw [kleisli_comp]
