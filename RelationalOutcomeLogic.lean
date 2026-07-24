@@ -4,3 +4,7 @@ import RelationalOutcomeLogic.Lang
 import RelationalOutcomeLogic.Unary.Assertions
 import RelationalOutcomeLogic.Unary.Triple
 import RelationalOutcomeLogic.Unary.Sanity
+import RelationalOutcomeLogic.Assertions
+import RelationalOutcomeLogic.Quadruple
+import RelationalOutcomeLogic.Rules
+import RelationalOutcomeLogic.Examples.NI

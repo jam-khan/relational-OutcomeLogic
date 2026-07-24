@@ -80,6 +80,9 @@ theorem sem_nonempty (c : Cmd) (s : State) : (sem c s).Nonempty := by
 @[simp] theorem semLift_singleton (c : Cmd) (s : State) : semLift c {s} = sem c s :=
   kleisli_singleton _ _
 
+@[simp] theorem semLift_skip (m : Set State) : semLift .skip m = m := by
+  ext t; simp [semLift]
+
 theorem semLift_union (c : Cmd) (m₁ m₂ : Set State) :
     semLift c (m₁ ∪ m₂) = semLift c m₁ ∪ semLift c m₂ :=
   kleisli_union _ m₁ m₂

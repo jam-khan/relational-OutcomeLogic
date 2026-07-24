@@ -64,6 +64,14 @@ the extended abstract's technical section (per Context.MD §7).
 ## Proofs that fought back
 (record: theorem, what broke, fix)
 
+- **Split probe (Phase 2.2): did NOT fight.** `quadSem_split` closed in 4 lines
+  (destructure the pre-split, rewrite with the two union-preservation laws,
+  `oplus_intro`). Confirms the prediction: the soundness direction of Split never
+  needs Lemma D.3's side conditions (implication-freeness, falsifiable instance) —
+  those belong to the *inversion* direction (failure-mode enumeration, Phase 3.6).
+  The relational research content is therefore concentrated in falsification
+  completeness, not in the proof system.
+
 ## Failure-mode catalog (Phase 3.5/3.6 findings)
 - Unary OL (Lemma 5.5) has exactly 3 failure modes; relational n=1 already has 4
   primitives (left-divergence, right-divergence, bad-pair-reachable; coverage joins at n≥2).
