@@ -72,6 +72,9 @@ theorem sem_nonempty (c : Cmd) (s : State) : (sem c s).Nonempty := by
 
 /-! ## Lift kit (the execution-model laws, inherited from `kleisli`) -/
 
+@[simp] theorem mem_semLift {c : Cmd} {m : Set State} {t : State} :
+    t ∈ semLift c m ↔ ∃ s ∈ m, t ∈ sem c s := mem_kleisli
+
 @[simp] theorem semLift_empty (c : Cmd) : semLift c ∅ = ∅ := kleisli_empty _
 
 @[simp] theorem semLift_singleton (c : Cmd) (s : State) : semLift c {s} = sem c s :=
