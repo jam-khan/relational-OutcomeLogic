@@ -1,16 +1,5 @@
-import RelationalOutcomeLogic.Basic
-import RelationalOutcomeLogic.Kleisli
-import RelationalOutcomeLogic.Lang
-import RelationalOutcomeLogic.Unary.Assertions
-import RelationalOutcomeLogic.Unary.Triple
-import RelationalOutcomeLogic.Unary.Sanity
-import RelationalOutcomeLogic.Assertions
-import RelationalOutcomeLogic.Quadruple
-import RelationalOutcomeLogic.Rules
-import RelationalOutcomeLogic.Metatheory
-import RelationalOutcomeLogic.Examples.NI
-import RelationalOutcomeLogic.Hetero.Lang
-import RelationalOutcomeLogic.Hetero.Refinement
-import RelationalOutcomeLogic.Examples.Translation
-import RelationalOutcomeLogic.Compiler.Lowering
-import RelationalOutcomeLogic.Examples.Compiler
+/-! # Relational Outcome Logic — redo from scratch.
+
+Root module. Add `import RelationalOutcomeLogic.<File>` lines as the redo
+progresses (see README checklist). Reference implementation: `prototype`
+branch. -/
