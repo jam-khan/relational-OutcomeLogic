@@ -23,7 +23,7 @@ def mallocProg : Cmd := .choice (.assign "p" fun _ => 1) (.assign "p" fun _ => 0
 theorem assign_const_spec (x : String) (v : Int) :
     triple (atomU fun _ => True) (.assign x fun _ => v) (atomU fun s => s x = v) := by
   rintro m ⟨hne, -⟩
-  refine ⟨semLift_nonempty _ hne, ?_⟩
+  refine ⟨semLift_nonempty (by simp) hne, ?_⟩
   rintro t ht
   obtain ⟨s, -, ht⟩ := mem_semLift.mp ht
   simp only [sem_assign, Set.mem_singleton_iff] at ht

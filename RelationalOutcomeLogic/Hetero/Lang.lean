@@ -25,6 +25,8 @@ definitions are duplicated.
 
 namespace RelOL
 
+attribute [local instance] Classical.propDecidable
+
 /-- C-like program states. -/
 abbrev StC := String → Int
 
@@ -53,27 +55,81 @@ inductive CmdC where
   | assign (x : String) (e : StC → Int)
   | seq (c₁ c₂ : CmdC)
   | choice (c₁ c₂ : CmdC)
+  | ite (b : StC → Prop) (c₁ c₂ : CmdC)
+  | while (b : StC → Prop) (c : CmdC)
   | addAssign (x y : String)
 
 /-- C-like semantics: plain powerset; `addAssign` wraps modulo `WORD`, always ok. -/
-def semC : CmdC → StC → Set StC
+noncomputable def semC : CmdC → StC → Set StC
   | .skip, s => {s}
   | .assign x e, s => {Function.update s x (e s)}
   | .seq c₁ c₂, s => kleisli (semC c₂) (semC c₁ s)
   | .choice c₁ c₂, s => semC c₁ s ∪ semC c₂ s
+  | .ite b c₁ c₂, s => if b s then semC c₁ s else semC c₂ s
+  | .while b c, s => loopSem b (semC c) s
   | .addAssign x y, s => {Function.update s x ((s x + s y) % WORD)}
 
-def semLiftC (c : CmdC) : Set StC → Set StC := kleisli (semC c)
+noncomputable def semLiftC (c : CmdC) : Set StC → Set StC := kleisli (semC c)
 
 @[simp] theorem semC_addAssign (x y : String) (s : StC) :
     semC (.addAssign x y) s = {Function.update s x ((s x + s y) % WORD)} := rfl
 
-theorem semC_nonempty (c : CmdC) (s : StC) : (semC c s).Nonempty := by
+theorem semC_seq (c₁ c₂ : CmdC) (s : StC) :
+    semC (.seq c₁ c₂) s = kleisli (semC c₂) (semC c₁ s) := rfl
+
+theorem semC_choice (c₁ c₂ : CmdC) (s : StC) :
+    semC (.choice c₁ c₂) s = semC c₁ s ∪ semC c₂ s := rfl
+
+theorem semC_ite_pos {b : StC → Prop} {s : StC} (h : b s) (c₁ c₂ : CmdC) :
+    semC (.ite b c₁ c₂) s = semC c₁ s := by
+  simp only [semC, if_pos h]
+
+theorem semC_ite_neg {b : StC → Prop} {s : StC} (h : ¬ b s) (c₁ c₂ : CmdC) :
+    semC (.ite b c₁ c₂) s = semC c₂ s := by
+  simp only [semC, if_neg h]
+
+theorem semC_while (b : StC → Prop) (c : CmdC) (s : StC) :
+    semC (.while b c) s = loopSem b (semC c) s := rfl
+
+/-- The fixpoint unrolling equation for C-like `while`. -/
+theorem semC_while_unfold (b : StC → Prop) (c : CmdC) (s : StC) :
+    semC (.while b c) s
+      = if b s then semLiftC (.while b c) (semC c s) else {s} :=
+  loopSem_unfold b (semC c) s
+
+theorem semC_while_pos {b : StC → Prop} {s : StC} (h : b s) (c : CmdC) :
+    semC (.while b c) s = semLiftC (.while b c) (semC c s) := by
+  rw [semC_while_unfold, if_pos h]
+
+theorem semC_while_neg {b : StC → Prop} {s : StC} (h : ¬ b s) (c : CmdC) :
+    semC (.while b c) s = {s} := by
+  rw [semC_while_unfold, if_neg h]
+
+theorem loopIter_subset_semC (b : StC → Prop) (c : CmdC) (n : ℕ) (s : StC) :
+    loopIter b (semC c) n s ⊆ semC (.while b c) s :=
+  loopIter_subset_loopSem b (semC c) n s
+
+/-- Structurally loop-free C-like commands. -/
+@[simp] def LoopFreeC : CmdC → Prop
+  | .skip => True
+  | .assign _ _ => True
+  | .seq c₁ c₂ => LoopFreeC c₁ ∧ LoopFreeC c₂
+  | .choice c₁ c₂ => LoopFreeC c₁ ∧ LoopFreeC c₂
+  | .ite _ c₁ c₂ => LoopFreeC c₁ ∧ LoopFreeC c₂
+  | .while _ _ => False
+  | .addAssign _ _ => True
+
+theorem semC_nonempty {c : CmdC} (hc : LoopFreeC c) (s : StC) : (semC c s).Nonempty := by
   induction c generalizing s with
   | skip => exact ⟨s, rfl⟩
   | assign x e => exact ⟨_, rfl⟩
-  | seq c₁ c₂ ih₁ ih₂ => exact kleisli_nonempty (ih₁ s) fun t _ => ih₂ t
-  | choice c₁ c₂ ih₁ ih₂ => exact (ih₁ s).inl
+  | seq c₁ c₂ ih₁ ih₂ => exact kleisli_nonempty (ih₁ hc.1 s) fun t _ => ih₂ hc.2 t
+  | choice c₁ c₂ ih₁ ih₂ => exact (ih₁ hc.1 s).inl
+  | ite b c₁ c₂ ih₁ ih₂ =>
+    by_cases h : b s
+    · rw [semC_ite_pos h]; exact ih₁ hc.1 s
+    · rw [semC_ite_neg h]; exact ih₂ hc.2 s
+  | «while» b c ih => exact hc.elim
   | addAssign x y => exact ⟨_, rfl⟩
 
 @[simp] theorem mem_semLiftC {c : CmdC} {m : Set StC} {t : StC} :
@@ -82,9 +138,9 @@ theorem semC_nonempty (c : CmdC) (s : StC) : (semC c s).Nonempty := by
 @[simp] theorem semLiftC_singleton (c : CmdC) (s : StC) : semLiftC c {s} = semC c s :=
   kleisli_singleton _ _
 
-theorem semLiftC_nonempty (c : CmdC) {m : Set StC} (hm : m.Nonempty) :
+theorem semLiftC_nonempty {c : CmdC} (hc : LoopFreeC c) {m : Set StC} (hm : m.Nonempty) :
     (semLiftC c m).Nonempty :=
-  kleisli_nonempty hm fun s _ => semC_nonempty c s
+  kleisli_nonempty hm fun s _ => semC_nonempty hc s
 
 /-! ## The error-propagating Kleisli step -/
 
@@ -121,6 +177,100 @@ theorem errK_assoc {ε σ τ υ : Type*} (k₁ : σ → Set (Except ε τ))
   | error e => simp
   | ok s => rfl
 
+theorem errK_mono {ε σ τ : Type*} {k₁ k₂ : σ → Set (Except ε τ)}
+    (h : ∀ s, k₁ s ⊆ k₂ s) (a : Except ε σ) : errK k₁ a ⊆ errK k₂ a := by
+  cases a with
+  | error e => exact fun x hx => hx
+  | ok s => exact h s
+
+/-- `errK` commutes with indexed unions of continuations (the index must be
+inhabited so the error case's constant `{.error e}` survives). -/
+theorem errK_iUnion {ε σ τ : Type*} {ι : Sort*} [Nonempty ι]
+    (k : ι → σ → Set (Except ε τ)) (a : Except ε σ) :
+    errK (fun s => ⋃ i, k i s) a = ⋃ i, errK (k i) a := by
+  cases a with
+  | error e => simp [errK_error, Set.iUnion_const]
+  | ok s => simp only [errK_ok]
+
+/-! ## Error-propagating while-loops
+
+The Kleene iterator for loops over an error carrier: the body's outcomes are
+`Except`-valued, the continuation re-enters the loop through `errK` (panics
+propagate, ok-states iterate), and guard failure exits with `.ok s`. -/
+
+/-- Fuel-indexed truncation of an error-propagating while-loop. -/
+noncomputable def errLoopIter {ε σ : Type*} (b : σ → Prop)
+    (step : σ → Set (Except ε σ)) : ℕ → σ → Set (Except ε σ)
+  | 0, _ => ∅
+  | n + 1, s =>
+      if b s then kleisli (errK (errLoopIter b step n)) (step s) else {.ok s}
+
+@[simp] theorem errLoopIter_zero {ε σ : Type*} (b : σ → Prop)
+    (step : σ → Set (Except ε σ)) (s : σ) : errLoopIter b step 0 s = ∅ := rfl
+
+theorem errLoopIter_succ_pos {ε σ : Type*} {b : σ → Prop} {s : σ} (h : b s)
+    (step : σ → Set (Except ε σ)) (n : ℕ) :
+    errLoopIter b step (n + 1) s
+      = kleisli (errK (errLoopIter b step n)) (step s) := by
+  simp only [errLoopIter, if_pos h]
+
+theorem errLoopIter_succ_neg {ε σ : Type*} {b : σ → Prop} {s : σ} (h : ¬ b s)
+    (step : σ → Set (Except ε σ)) (n : ℕ) :
+    errLoopIter b step (n + 1) s = {.ok s} := by
+  simp only [errLoopIter, if_neg h]
+
+/-- Semantics of an error-propagating `while`: union over all fuels. -/
+noncomputable def errLoopSem {ε σ : Type*} (b : σ → Prop)
+    (step : σ → Set (Except ε σ)) (s : σ) : Set (Except ε σ) :=
+  ⋃ n, errLoopIter b step n s
+
+theorem errLoopIter_subset_errLoopSem {ε σ : Type*} (b : σ → Prop)
+    (step : σ → Set (Except ε σ)) (n : ℕ) (s : σ) :
+    errLoopIter b step n s ⊆ errLoopSem b step s :=
+  Set.subset_iUnion (fun n => errLoopIter b step n s) n
+
+/-- The fixpoint unrolling equation for error-propagating loops. -/
+theorem errLoopSem_unfold {ε σ : Type*} (b : σ → Prop)
+    (step : σ → Set (Except ε σ)) (s : σ) :
+    errLoopSem b step s
+      = if b s then kleisli (errK (errLoopSem b step)) (step s) else {.ok s} := by
+  by_cases h : b s
+  · rw [if_pos h]
+    unfold errLoopSem
+    have : (errK fun t => ⋃ n, errLoopIter b step n t)
+        = fun a => ⋃ n, errK (errLoopIter b step n) a := by
+      funext a; exact errK_iUnion _ a
+    rw [this, kleisli_iUnion_fun]
+    ext t
+    simp only [Set.mem_iUnion]
+    constructor
+    · rintro ⟨n, ht⟩
+      cases n with
+      | zero => simp at ht
+      | succ n => rw [errLoopIter_succ_pos h] at ht; exact ⟨n, ht⟩
+    · rintro ⟨n, ht⟩
+      exact ⟨n + 1, by rw [errLoopIter_succ_pos h]; exact ht⟩
+  · rw [if_neg h]
+    unfold errLoopSem
+    ext t
+    simp only [Set.mem_iUnion]
+    constructor
+    · rintro ⟨n, ht⟩
+      cases n with
+      | zero => simp at ht
+      | succ n => rwa [errLoopIter_succ_neg h] at ht
+    · exact fun ht => ⟨1, by rwa [errLoopIter_succ_neg h]⟩
+
+theorem errLoopSem_pos {ε σ : Type*} {b : σ → Prop} {s : σ} (h : b s)
+    (step : σ → Set (Except ε σ)) :
+    errLoopSem b step s = kleisli (errK (errLoopSem b step)) (step s) := by
+  rw [errLoopSem_unfold, if_pos h]
+
+theorem errLoopSem_neg {ε σ : Type*} {b : σ → Prop} {s : σ} (h : ¬ b s)
+    (step : σ → Set (Except ε σ)) :
+    errLoopSem b step s = {.ok s} := by
+  rw [errLoopSem_unfold, if_neg h]
+
 /-! ## The Rust-like side -/
 
 /-- Rust-like commands: checked addition, deterministic (no choice). -/
@@ -128,18 +278,22 @@ inductive CmdR where
   | skip
   | assign (x : String) (e : StR → Int)
   | seq (c₁ c₂ : CmdR)
+  | ite (b : StR → Prop) (c₁ c₂ : CmdR)
+  | while (b : StR → Prop) (c : CmdR)
   | addAssign (x y : String)
 
 /-- Rust-like semantics into the error carrier: checked `addAssign` panics on
-overflow. -/
-def semR : CmdR → StR → Set (Except Unit StR)
+overflow; loops iterate through `errK`, so a panic mid-loop aborts the loop. -/
+noncomputable def semR : CmdR → StR → Set (Except Unit StR)
   | .skip, s => {.ok s}
   | .assign x e, s => {.ok (Function.update s x (e s))}
   | .seq c₁ c₂, s => kleisli (errK (semR c₂)) (semR c₁ s)
+  | .ite b c₁ c₂, s => if b s then semR c₁ s else semR c₂ s
+  | .while b c, s => errLoopSem b (semR c) s
   | .addAssign x y, s =>
       if s x + s y < WORD then {.ok (Function.update s x (s x + s y))} else {.error ()}
 
-def semLiftR (c : CmdR) : Set (Except Unit StR) → Set (Except Unit StR) :=
+noncomputable def semLiftR (c : CmdR) : Set (Except Unit StR) → Set (Except Unit StR) :=
   kleisli (errK (semR c))
 
 theorem semR_addAssign_ok {x y : String} {s : StR} (h : s x + s y < WORD) :
@@ -150,11 +304,58 @@ theorem semR_addAssign_err {x y : String} {s : StR} (h : ¬ s x + s y < WORD) :
     semR (.addAssign x y) s = {.error ()} := by
   simp only [semR, if_neg h]
 
-theorem semR_nonempty (c : CmdR) (s : StR) : (semR c s).Nonempty := by
+theorem semR_seq (c₁ c₂ : CmdR) (s : StR) :
+    semR (.seq c₁ c₂) s = kleisli (errK (semR c₂)) (semR c₁ s) := rfl
+
+theorem semR_ite_pos {b : StR → Prop} {s : StR} (h : b s) (c₁ c₂ : CmdR) :
+    semR (.ite b c₁ c₂) s = semR c₁ s := by
+  simp only [semR, if_pos h]
+
+theorem semR_ite_neg {b : StR → Prop} {s : StR} (h : ¬ b s) (c₁ c₂ : CmdR) :
+    semR (.ite b c₁ c₂) s = semR c₂ s := by
+  simp only [semR, if_neg h]
+
+theorem semR_while (b : StR → Prop) (c : CmdR) (s : StR) :
+    semR (.while b c) s = errLoopSem b (semR c) s := rfl
+
+/-- The fixpoint unrolling equation for Rust-like `while`. -/
+theorem semR_while_unfold (b : StR → Prop) (c : CmdR) (s : StR) :
+    semR (.while b c) s
+      = if b s then semLiftR (.while b c) (semR c s) else {.ok s} :=
+  errLoopSem_unfold b (semR c) s
+
+theorem semR_while_pos {b : StR → Prop} {s : StR} (h : b s) (c : CmdR) :
+    semR (.while b c) s = semLiftR (.while b c) (semR c s) := by
+  rw [semR_while_unfold, if_pos h]
+
+theorem semR_while_neg {b : StR → Prop} {s : StR} (h : ¬ b s) (c : CmdR) :
+    semR (.while b c) s = {.ok s} := by
+  rw [semR_while_unfold, if_neg h]
+
+theorem errLoopIter_subset_semR (b : StR → Prop) (c : CmdR) (n : ℕ) (s : StR) :
+    errLoopIter b (semR c) n s ⊆ semR (.while b c) s :=
+  errLoopIter_subset_errLoopSem b (semR c) n s
+
+/-- Structurally loop-free Rust-like commands. -/
+@[simp] def LoopFreeR : CmdR → Prop
+  | .skip => True
+  | .assign _ _ => True
+  | .seq c₁ c₂ => LoopFreeR c₁ ∧ LoopFreeR c₂
+  | .ite _ c₁ c₂ => LoopFreeR c₁ ∧ LoopFreeR c₂
+  | .while _ _ => False
+  | .addAssign _ _ => True
+
+theorem semR_nonempty {c : CmdR} (hc : LoopFreeR c) (s : StR) : (semR c s).Nonempty := by
   induction c generalizing s with
   | skip => exact ⟨_, rfl⟩
   | assign x e => exact ⟨_, rfl⟩
-  | seq c₁ c₂ ih₁ ih₂ => exact kleisli_nonempty (ih₁ s) fun a _ => errK_nonempty ih₂ a
+  | seq c₁ c₂ ih₁ ih₂ =>
+    exact kleisli_nonempty (ih₁ hc.1 s) fun a _ => errK_nonempty (ih₂ hc.2) a
+  | ite b c₁ c₂ ih₁ ih₂ =>
+    by_cases h : b s
+    · rw [semR_ite_pos h]; exact ih₁ hc.1 s
+    · rw [semR_ite_neg h]; exact ih₂ hc.2 s
+  | «while» b c ih => exact hc.elim
   | addAssign x y =>
     by_cases h : s x + s y < WORD
     · rw [semR_addAssign_ok h]; exact ⟨_, rfl⟩
@@ -167,9 +368,9 @@ theorem semR_nonempty (c : CmdR) (s : StR) : (semR c s).Nonempty := by
     semLiftR c {a} = errK (semR c) a :=
   kleisli_singleton _ _
 
-theorem semLiftR_nonempty (c : CmdR) {m : Set (Except Unit StR)} (hm : m.Nonempty) :
-    (semLiftR c m).Nonempty :=
-  kleisli_nonempty hm fun a _ => errK_nonempty (semR_nonempty c) a
+theorem semLiftR_nonempty {c : CmdR} (hc : LoopFreeR c) {m : Set (Except Unit StR)}
+    (hm : m.Nonempty) : (semLiftR c m).Nonempty :=
+  kleisli_nonempty hm fun a _ => errK_nonempty (semR_nonempty hc) a
 
 /-! ## The heterogeneous quadruple -/
 
@@ -178,5 +379,77 @@ right — an *instantiation* of the polymorphic `quadSem`, not a new definition.
 def quadH (R : RAssn StC (Except Unit StR)) (c : CmdC) (c' : CmdR)
     (S : RAssn StC (Except Unit StR)) : Prop :=
   quadSem (semLiftC c) (semLiftR c') R S
+
+/-! ## Heterogeneous atomic axioms
+
+The named rules for the primitive statements both sides share. The
+`ok`-correspondence precondition `a = .ok s` couples each Rust-like outcome to
+the C-like state it mirrors; the postconditions certify the correspondence
+(ok case), or its collapse into the panic (overflow case). -/
+
+@[simp] theorem semC_skip (s : StC) : semC .skip s = {s} := rfl
+
+@[simp] theorem semC_assign (x : String) (e : StC → Int) (s : StC) :
+    semC (.assign x e) s = {Function.update s x (e s)} := rfl
+
+@[simp] theorem semR_skip (s : StR) : semR .skip s = {.ok s} := rfl
+
+@[simp] theorem semR_assign (x : String) (e : StR → Int) (s : StR) :
+    semR (.assign x e) s = {.ok (Function.update s x (e s))} := rfl
+
+theorem quadH_skip :
+    quadH (atom fun s a => a = .ok s) .skip .skip (atom fun t b => b = .ok t) := by
+  rintro m m' ⟨hm, hm', hall⟩
+  refine ⟨semLiftC_nonempty (by simp) hm, semLiftR_nonempty (by simp) hm', ?_⟩
+  rintro t ht b hb
+  obtain ⟨s, hs, ht⟩ := mem_semLiftC.mp ht
+  obtain ⟨a, ha, hb⟩ := mem_semLiftR.mp hb
+  obtain rfl := hall s hs a ha
+  simp only [errK_ok, semR_skip, Set.mem_singleton_iff] at hb
+  simp only [semC_skip, Set.mem_singleton_iff] at ht
+  simp [hb, ht]
+
+/-- Synchronized assignment across the two execution models. -/
+theorem quadH_assign (x : String) (e : StC → Int) :
+    quadH (atom fun s a => a = .ok s) (.assign x e) (.assign x e)
+      (atom fun t b => b = .ok t) := by
+  rintro m m' ⟨hm, hm', hall⟩
+  refine ⟨semLiftC_nonempty (by simp) hm, semLiftR_nonempty (by simp) hm', ?_⟩
+  rintro t ht b hb
+  obtain ⟨s, hs, ht⟩ := mem_semLiftC.mp ht
+  obtain ⟨a, ha, hb⟩ := mem_semLiftR.mp hb
+  obtain rfl := hall s hs a ha
+  simp only [errK_ok, semR_assign, Set.mem_singleton_iff] at hb
+  simp only [semC_assign, Set.mem_singleton_iff] at ht
+  simp [hb, ht]
+
+/-- Checked and wrapping addition agree below the word bound: the wrap is the
+identity, so the ok-correspondence is preserved. -/
+theorem quadH_addAssign_ok (x y : String) :
+    quadH (atom fun s a => a = .ok s ∧ 0 ≤ s x + s y ∧ s x + s y < WORD)
+      (.addAssign x y) (.addAssign x y) (atom fun t b => b = .ok t) := by
+  rintro m m' ⟨hm, hm', hall⟩
+  refine ⟨semLiftC_nonempty (by simp) hm, semLiftR_nonempty (by simp) hm', ?_⟩
+  rintro t ht b hb
+  obtain ⟨s, hs, ht⟩ := mem_semLiftC.mp ht
+  obtain ⟨a, ha, hb⟩ := mem_semLiftR.mp hb
+  obtain ⟨rfl, h0, hlt⟩ := hall s hs a ha
+  rw [errK_ok, semR_addAssign_ok hlt, Set.mem_singleton_iff] at hb
+  rw [semC_addAssign, Set.mem_singleton_iff, Int.emod_eq_of_lt h0 hlt] at ht
+  simp [hb, ht]
+
+/-- On overflow the Rust-like side's entire outcome set is the panic, whatever
+the C-like side wraps to. -/
+theorem quadH_addAssign_panic (x y : String) :
+    quadH (atom fun s a => a = .ok s ∧ WORD ≤ s x + s y)
+      (.addAssign x y) (.addAssign x y) (atom fun _ b => b = .error ()) := by
+  rintro m m' ⟨hm, hm', hall⟩
+  refine ⟨semLiftC_nonempty (by simp) hm, semLiftR_nonempty (by simp) hm', ?_⟩
+  rintro t _ b hb
+  obtain ⟨a, ha, hb⟩ := mem_semLiftR.mp hb
+  obtain ⟨s, hs⟩ := hm
+  obtain ⟨rfl, hge⟩ := hall s hs a ha
+  rw [errK_ok, semR_addAssign_err (by omega), Set.mem_singleton_iff] at hb
+  exact hb
 
 end RelOL

@@ -54,7 +54,7 @@ theorem insecure :
     ⦃preIns⦄ prog ~ prog ⦃(atom fun s s' => s "low" = 1 ∧ s' "low" = 0) ⊕ₒ rtop⦄ := by
   rintro m m' ⟨hm, hm', hall⟩
   apply oplus_left_top
-  refine ⟨semLift_nonempty _ hm, semLift_nonempty _ hm', ?_⟩
+  refine ⟨semLift_nonempty (by simp [prog]) hm, semLift_nonempty (by simp [prog]) hm', ?_⟩
   rintro t ht t' ht'
   obtain ⟨s, hs, ht⟩ := mem_semLift.mp ht
   obtain ⟨s', hs', ht'⟩ := mem_semLift.mp ht'

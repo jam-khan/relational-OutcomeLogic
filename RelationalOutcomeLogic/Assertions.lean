@@ -28,6 +28,12 @@ cross pair of outcomes related by `r`. -/
 def atom (r : α → β → Prop) : RAssn α β := fun m m' =>
   m.Nonempty ∧ m'.Nonempty ∧ ∀ x ∈ m, ∀ y ∈ m', r x y
 
+/-- Weak relational atom: the cross-product condition of `atom` *without*
+joint reachability. Divergence-closed (`atomW r ∅ m'` always holds), which is
+exactly what partial-correctness bridges (relational Hoare logic) and
+divergence-tolerant simulation statements need. -/
+def atomW (r : α → β → Prop) : RAssn α β := fun m m' => ∀ x ∈ m, ∀ y ∈ m', r x y
+
 /-- Pairwise outcome conjunction: both sides split simultaneously (overlap-friendly). -/
 def oplus (P Q : RAssn α β) : RAssn α β := fun m m' =>
   ∃ m₁ m₂ m₁' m₂', m = m₁ ∪ m₂ ∧ m' = m₁' ∪ m₂' ∧ P m₁ m₁' ∧ Q m₂ m₂'
@@ -93,5 +99,58 @@ theorem rel_true_positives {r : α → β → Prop} {m m'} (h : (atom r ⊕ₒ r
     ∃ x ∈ m, ∃ y ∈ m', r x y := by
   obtain ⟨m₁, m₂, m₁', m₂', rfl, rfl, ⟨⟨x, hx⟩, ⟨y, hy⟩, hall⟩, -⟩ := h
   exact ⟨x, Set.mem_union_left _ hx, y, Set.mem_union_left _ hy, hall x hx y hy⟩
+
+/-- `⊕ ⊤` certificates are monotone under enlarging the outcome sets: the new
+outcomes go into the `⊤` part. This is what lets a certificate proved on a
+fuel-truncated loop transfer to the full loop. -/
+theorem oplus_top_mono {S : RAssn α β} {m₀ m : Set α} {m₀' m' : Set β}
+    (h : (S ⊕ₒ rtop) m₀ m₀') (hm : m₀ ⊆ m) (hm' : m₀' ⊆ m') :
+    (S ⊕ₒ rtop) m m' := by
+  obtain ⟨m₁, m₂, m₁', m₂', rfl, rfl, hS, -⟩ := h
+  exact ⟨m₁, m, m₁', m',
+    (Set.union_eq_self_of_subset_left (Set.subset_union_left.trans hm)).symm,
+    (Set.union_eq_self_of_subset_left (Set.subset_union_left.trans hm')).symm,
+    hS, trivial⟩
+
+/-! ## Weak-atom kit -/
+
+/-- `atom` is exactly `atomW` plus joint reachability. -/
+theorem atom_iff_atomW {r : α → β → Prop} {m : Set α} {m' : Set β} :
+    atom r m m' ↔ m.Nonempty ∧ m'.Nonempty ∧ atomW r m m' :=
+  Iff.rfl
+
+theorem atomW_of_atom {r : α → β → Prop} : entail (atom r) (atomW r) :=
+  fun _ _ h => h.2.2
+
+@[simp] theorem atomW_singleton_iff {r : α → β → Prop} {a : α} {b : β} :
+    atomW r {a} {b} ↔ r a b := by
+  simp [atomW]
+
+theorem atomW_mono {r r' : α → β → Prop} (h : ∀ x y, r x y → r' x y) :
+    entail (atomW r) (atomW r') :=
+  fun _ _ hall x hx y hy => h x y (hall x hx y hy)
+
+@[simp] theorem atomW_empty_left (r : α → β → Prop) (m' : Set β) :
+    atomW r ∅ m' := by
+  simp [atomW]
+
+@[simp] theorem atomW_empty_right (r : α → β → Prop) (m : Set α) :
+    atomW r m ∅ := by
+  simp [atomW]
+
+/-! ## Swap kit (for deriving right-sided rules from left-sided ones) -/
+
+@[simp] theorem RAssn.swap_swap (R : RAssn α β) : R.swap.swap = R := rfl
+
+theorem RAssn.swap_oplus (P Q : RAssn α β) :
+    (P ⊕ₒ Q).swap = (P.swap ⊕ₒ Q.swap) := by
+  funext m' m
+  unfold RAssn.swap oplus
+  apply propext
+  constructor
+  · rintro ⟨m₁, m₂, m₁', m₂', h₁, h₂, hP, hQ⟩
+    exact ⟨m₁', m₂', m₁, m₂, h₂, h₁, hP, hQ⟩
+  · rintro ⟨m₁', m₂', m₁, m₂, h₂, h₁, hP, hQ⟩
+    exact ⟨m₁, m₂, m₁', m₂', h₁, h₂, hP, hQ⟩
 
 end RelOL

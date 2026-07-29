@@ -99,4 +99,64 @@ theorem lowerBug_not_correct : ¬ lowered lowerBug thrProg zSt := by
   rw [hrel] at hy2
   simp [sX, zSt] at hy2
 
+/-! ## The loop miscompilation
+
+The buggy pass also drops the error check from the *loop guard*: after an
+in-body exception the target keeps looping. `thrLoop` throws in its first
+iteration; the correct pass exits the loop at the throw-point store (and is
+covered by the ∀-programs theorem `lower_correct`), while the buggy target
+runs the rest of the iteration — observably bumping `i`. -/
+
+/-- `while (i < 1) { throw; i := i + 1 }`. -/
+def thrLoop : CmdS :=
+  .while (fun s => s "i" < 1) (.seq .throw (.assign "i" fun s => s "i" + 1))
+
+/-- The correct pass validates on the loop program — an instance of the
+∀-programs theorem, not a bespoke proof. -/
+theorem lower_thrLoop_correct : loweredW lower thrLoop zSt :=
+  lower_correct _ (by simp [thrLoop]) _ rfl
+
+theorem semS_thrLoop : semS thrLoop zSt = {Except.error zSt} := by
+  rw [thrLoop, semS_while,
+    errLoopSem_pos (b := fun s => s "i" < 1) (s := zSt) (by simp [zSt])]
+  rw [semS_seq, semS_throw, kleisli_singleton, errK_error, kleisli_singleton,
+    errK_error]
+
+theorem sem_lowerBug_thrLoop :
+    sem (lowerBug thrLoop) zSt
+      = {Function.update (Function.update zSt "err" 1) "i" 1} := by
+  change sem (.while (fun s => s "i" < 1)
+    (.seq (.assign "err" fun _ => 1) (.assign "i" fun s => s "i" + 1))) zSt = _
+  rw [sem_while_pos (b := fun s => s "i" < 1) (s := zSt) (by simp [zSt])]
+  have hbody : sem (.seq (.assign "err" fun _ => (1 : Int))
+      (.assign "i" fun s => s "i" + 1)) zSt
+      = {Function.update (Function.update zSt "err" 1) "i" 1} := by
+    rw [sem_seq, sem_assign, kleisli_singleton, sem_assign]
+    simp [zSt]
+  rw [hbody, semLift_singleton,
+    sem_while_neg (b := fun s => s "i" < 1)
+      (s := Function.update (Function.update zSt "err" 1) "i" 1) (by simp)]
+
+/-- **The loop miscompilation certificate**: the source raises with `i = 0`;
+the buggy target finishes the iteration and exits with `i = 1`. -/
+theorem miscompiled_loop :
+    quadSem (semLiftS thrLoop) (semLift (lowerBug thrLoop))
+      (fun m m' => m = {Except.ok zSt} ∧ m' = {zSt})
+      (atom fun a t' => a = Except.error zSt ∧ t' "i" = 1 ∧ zSt "i" = 0) := by
+  rintro m m' ⟨rfl, rfl⟩
+  rw [semLiftS_singleton, errK_ok, semS_thrLoop, semLift_singleton,
+    sem_lowerBug_thrLoop]
+  refine atom_singleton_iff.mpr ⟨rfl, ?_, rfl⟩
+  simp
+
+/-- The buggy pass provably miscompiles the loop program, by denial. -/
+theorem lowerBug_loop_not_correct : ¬ lowered lowerBug thrLoop zSt := by
+  refine denial miscompiled_loop ?_ ⟨_, _, rfl, rfl⟩
+  rintro n n' hT hL
+  obtain ⟨⟨a, ha⟩, ⟨t', ht'⟩, hall⟩ := hT
+  obtain ⟨rfl, hi1, -⟩ := hall a ha t' ht'
+  have hrel : t' = Function.update zSt "err" 1 := atom_pair_elim hL ha ht'
+  rw [hrel] at hi1
+  simp [zSt] at hi1
+
 end RelOL

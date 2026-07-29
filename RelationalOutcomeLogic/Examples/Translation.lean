@@ -49,7 +49,7 @@ coverage of the Rust outcomes. -/
 theorem translation_bug_exhaustive :
     quadH preOvf cProg rProg (atom fun _ b => b = .error ()) := by
   rintro m m' ⟨hm, hm', hall⟩
-  refine ⟨semLiftC_nonempty _ hm, semLiftR_nonempty _ hm', ?_⟩
+  refine ⟨semLiftC_nonempty (by simp [cProg]) hm, semLiftR_nonempty (by simp [rProg]) hm', ?_⟩
   rintro t ht b hb
   obtain ⟨s, hs, -⟩ := mem_semLiftC.mp ht
   obtain ⟨a, ha, hb⟩ := mem_semLiftR.mp hb

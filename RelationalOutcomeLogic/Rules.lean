@@ -111,4 +111,154 @@ theorem quad_underapprox {R S : RAssn State State} {c c' : Cmd} (h : ⦃R⦄ c ~
     (d : Cmd) : ⦃R⦄ Cmd.choice c d ~ c' ⦃S ⊕ₒ rtop⦄ :=
   quad_choice_left h (quad_rtop R d c')
 
+/-- One-sided Choice on the right, derived from `Choice-L` via `Sym` (closing
+the "derivable" claim in the paper's rule figure). -/
+theorem quad_choice_right {R S₁ S₂ : RAssn State State} {c c₁' c₂' : Cmd}
+    (h₁ : ⦃R⦄ c ~ c₁' ⦃S₁⦄) (h₂ : ⦃R⦄ c ~ c₂' ⦃S₂⦄) :
+    ⦃R⦄ c ~ Cmd.choice c₁' c₂' ⦃S₁ ⊕ₒ S₂⦄ := by
+  have h := quad_sym (quad_choice_left (quad_sym h₁) (quad_sym h₂))
+  rwa [RAssn.swap_swap, RAssn.swap_oplus, RAssn.swap_swap, RAssn.swap_swap] at h
+
+/-! ## Atomic axioms and conditional rules -/
+
+/-- Synchronized assignment axiom, Floyd-style forward form on atoms. -/
+theorem quad_assign {r : State → State → Prop} (x x' : String) (e e' : State → Int) :
+    ⦃atom fun s s' => r (Function.update s x (e s)) (Function.update s' x' (e' s'))⦄
+      Cmd.assign x e ~ Cmd.assign x' e' ⦃atom r⦄ := by
+  rintro m m' ⟨⟨s₀, hs₀⟩, ⟨s₀', hs₀'⟩, hall⟩
+  rw [semLift_assign, semLift_assign]
+  refine ⟨⟨_, Set.mem_image_of_mem _ hs₀⟩, ⟨_, Set.mem_image_of_mem _ hs₀'⟩, ?_⟩
+  rintro t ⟨s, hs, rfl⟩ t' ⟨s', hs', rfl⟩
+  exact hall s hs s' hs'
+
+/-- One-sided assignment: the left program assigns, the right stays put. -/
+theorem quad_assign_left {r : State → State → Prop} (x : String) (e : State → Int) :
+    ⦃atom fun s s' => r (Function.update s x (e s)) s'⦄
+      Cmd.assign x e ~ Cmd.skip ⦃atom r⦄ := by
+  rintro m m' ⟨⟨s₀, hs₀⟩, hne', hall⟩
+  rw [semLift_assign, semLift_skip]
+  refine ⟨⟨_, Set.mem_image_of_mem _ hs₀⟩, hne', ?_⟩
+  rintro t ⟨s, hs, rfl⟩ t' ht'
+  exact hall s hs t' ht'
+
+/-- Synchronized conditional, both guards uniformly true on the pre-models. The
+uniformly-false variant is `quad_ite_neg`; mixed pre-models are handled by
+splitting the precondition with `quad_split`. -/
+theorem quad_ite_pos {R S : RAssn State State} {b b' : State → Prop}
+    {c₁ c₂ c₁' c₂' : Cmd}
+    (hb : ∀ m m', R m m' → (∀ s ∈ m, b s) ∧ (∀ s' ∈ m', b' s'))
+    (h : ⦃R⦄ c₁ ~ c₁' ⦃S⦄) :
+    ⦃R⦄ Cmd.ite b c₁ c₂ ~ Cmd.ite b' c₁' c₂' ⦃S⦄ := by
+  intro m m' hm
+  obtain ⟨h₁, h₂⟩ := hb m m' hm
+  rw [semLift_ite_pos h₁, semLift_ite_pos h₂]
+  exact h m m' hm
+
+theorem quad_ite_neg {R S : RAssn State State} {b b' : State → Prop}
+    {c₁ c₂ c₁' c₂' : Cmd}
+    (hb : ∀ m m', R m m' → (∀ s ∈ m, ¬ b s) ∧ (∀ s' ∈ m', ¬ b' s'))
+    (h : ⦃R⦄ c₂ ~ c₂' ⦃S⦄) :
+    ⦃R⦄ Cmd.ite b c₁ c₂ ~ Cmd.ite b' c₁' c₂' ⦃S⦄ := by
+  intro m m' hm
+  obtain ⟨h₁, h₂⟩ := hb m m' hm
+  rw [semLift_ite_neg h₁, semLift_ite_neg h₂]
+  exact h m m' hm
+
+/-- One-sided conditional: only the left program branches. -/
+theorem quad_ite_left_pos {R S : RAssn State State} {b : State → Prop}
+    {c₁ c₂ c' : Cmd} (hb : ∀ m m', R m m' → ∀ s ∈ m, b s)
+    (h : ⦃R⦄ c₁ ~ c' ⦃S⦄) : ⦃R⦄ Cmd.ite b c₁ c₂ ~ c' ⦃S⦄ := by
+  intro m m' hm
+  rw [semLift_ite_pos (hb m m' hm)]
+  exact h m m' hm
+
+theorem quad_ite_left_neg {R S : RAssn State State} {b : State → Prop}
+    {c₁ c₂ c' : Cmd} (hb : ∀ m m', R m m' → ∀ s ∈ m, ¬ b s)
+    (h : ⦃R⦄ c₂ ~ c' ⦃S⦄) : ⦃R⦄ Cmd.ite b c₁ c₂ ~ c' ⦃S⦄ := by
+  intro m m' hm
+  rw [semLift_ite_neg (hb m m' hm)]
+  exact h m m' hm
+
+/-! ## While rules
+
+Three tiers, matching the three uses:
+* unrolling (`quad_while_unroll_left/right`) — replace the loop by one step;
+* fuel (`quad_while_fuel`) — an `⊕ ⊤` certificate on truncated loops transfers
+  to the full loops, the workhorse for certifying violations of loop programs;
+* ranked invariant (`quad_while_inv`) — the exhaustive reading, for loops whose
+  synchronized iteration count is bounded by the rank of the invariant. -/
+
+/-- The loop equals its one-step unrolling (left side). -/
+theorem quad_while_unroll_left {R S : RAssn State State} {b : State → Prop}
+    {c c' : Cmd}
+    (h : ⦃R⦄ Cmd.ite b (Cmd.seq c (Cmd.while b c)) Cmd.skip ~ c' ⦃S⦄) :
+    ⦃R⦄ Cmd.while b c ~ c' ⦃S⦄ := by
+  intro m m' hm
+  have hs := h m m' hm
+  rwa [show semLift (Cmd.ite b (Cmd.seq c (Cmd.while b c)) Cmd.skip) m
+      = semLift (Cmd.while b c) m from by
+    unfold semLift; rw [← sem_while_eq_unroll]] at hs
+
+/-- The loop equals its one-step unrolling (right side). -/
+theorem quad_while_unroll_right {R S : RAssn State State} {b' : State → Prop}
+    {c c' : Cmd}
+    (h : ⦃R⦄ c ~ Cmd.ite b' (Cmd.seq c' (Cmd.while b' c')) Cmd.skip ⦃S⦄) :
+    ⦃R⦄ c ~ Cmd.while b' c' ⦃S⦄ := by
+  intro m m' hm
+  have hs := h m m' hm
+  rwa [show semLift (Cmd.ite b' (Cmd.seq c' (Cmd.while b' c')) Cmd.skip) m'
+      = semLift (Cmd.while b' c') m' from by
+    unfold semLift; rw [← sem_while_eq_unroll]] at hs
+
+/-- **Fuel rule**: an under-approximate (`⊕ ⊤`) certificate proved against
+fuel-truncated loops transfers to the full loops — the truncations
+under-approximate the loop semantics, and `⊕ ⊤` absorbs the rest. -/
+theorem quad_while_fuel {R S : RAssn State State} {b b' : State → Prop}
+    {c c' : Cmd} (n n' : ℕ)
+    (h : quadSem (kleisli (loopIter b (sem c) n)) (kleisli (loopIter b' (sem c') n'))
+      R (S ⊕ₒ rtop)) :
+    ⦃R⦄ Cmd.while b c ~ Cmd.while b' c' ⦃S ⊕ₒ rtop⦄ := by
+  intro m m' hm
+  refine oplus_top_mono (h m m' hm) ?_ ?_
+  · exact kleisli_mono_fun (fun s => loopIter_subset_sem b c n s) m
+  · exact kleisli_mono_fun (fun s => loopIter_subset_sem b' c' n' s) m'
+
+/-- **Ranked-invariant rule** (exhaustive reading): `I k` is the relational
+invariant with `k` synchronized iterations remaining; the rank decides both
+guards uniformly, so both loops terminate in exactly the rank's iterations and
+divergence never enters. -/
+theorem quad_while_inv {I : ℕ → RAssn State State} {b b' : State → Prop}
+    {c c' : Cmd}
+    (hpos : ∀ k m m', I (k + 1) m m' → (∀ s ∈ m, b s) ∧ (∀ s' ∈ m', b' s'))
+    (hzero : ∀ m m', I 0 m m' → (∀ s ∈ m, ¬ b s) ∧ (∀ s' ∈ m', ¬ b' s'))
+    (hbody : ∀ k, ⦃I (k + 1)⦄ c ~ c' ⦃I k⦄) (k : ℕ) :
+    ⦃I k⦄ Cmd.while b c ~ Cmd.while b' c' ⦃I 0⦄ := by
+  induction k with
+  | zero =>
+    intro m m' hm
+    obtain ⟨h₁, h₂⟩ := hzero m m' hm
+    rwa [semLift_while_neg h₁, semLift_while_neg h₂]
+  | succ k ih =>
+    intro m m' hm
+    obtain ⟨h₁, h₂⟩ := hpos k m m' hm
+    rw [semLift_while_pos h₁, semLift_while_pos h₂]
+    exact ih _ _ (hbody k m m' hm)
+
+/-- One-sided ranked While: the left program loops, the right stays put. -/
+theorem quad_while_left {I : ℕ → RAssn State State} {b : State → Prop} {c : Cmd}
+    (hpos : ∀ k m m', I (k + 1) m m' → ∀ s ∈ m, b s)
+    (hzero : ∀ m m', I 0 m m' → ∀ s ∈ m, ¬ b s)
+    (hbody : ∀ k, ⦃I (k + 1)⦄ c ~ Cmd.skip ⦃I k⦄) (k : ℕ) :
+    ⦃I k⦄ Cmd.while b c ~ Cmd.skip ⦃I 0⦄ := by
+  induction k with
+  | zero =>
+    intro m m' hm
+    rwa [semLift_while_neg (hzero m m' hm), semLift_skip]
+  | succ k ih =>
+    intro m m' hm
+    rw [semLift_while_pos (hpos k m m' hm)]
+    refine ih _ _ ?_
+    have hb := hbody k m m' hm
+    rwa [semLift_skip] at hb
+
 end RelOL
