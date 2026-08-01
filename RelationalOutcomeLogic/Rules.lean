@@ -1,4 +1,5 @@
 import RelationalOutcomeLogic.Quadruple
+import RelationalOutcomeLogic.Coupling
 
 /-!
 # Soundness of the RelOL proof rules
@@ -260,5 +261,67 @@ theorem quad_while_left {I : ℕ → RAssn State State} {b : State → Prop} {c 
     refine ih _ _ ?_
     have hb := hbody k m m' hm
     rwa [semLift_skip] at hb
+
+/-! ## Coupling rules
+
+The coupling connective gets its own rule tier, all riding on `couple_bind`:
+a per-state coupling obligation lifts to arbitrary preconditions, so
+functional postconditions no longer force singleton preconditions. The While
+rule is the payoff: no fuel in the statement, no `⊕ ⊤`, no termination side
+condition — divergent paths contribute no outcomes to either side. -/
+
+/-- Per-state couplings lift to quadruples over arbitrary `couple` pres. -/
+theorem quad_couple_lift {r r' : State → State → Prop} {c c' : Cmd}
+    (h : ∀ s s', r s s' → couple r' (sem c s) (sem c' s')) :
+    ⦃couple r⦄ c ~ c' ⦃couple r'⦄ :=
+  fun _ _ hm => couple_bind hm h
+
+/-- Guard-synchronized conditionals couple branchwise. -/
+theorem quad_ite_couple {r r' : State → State → Prop} {b b' : State → Prop}
+    {c₁ c₂ c₁' c₂' : Cmd}
+    (hguard : ∀ s s', r s s' → (b s ↔ b' s'))
+    (h₁ : ∀ s s', r s s' → b s → b' s' → couple r' (sem c₁ s) (sem c₁' s'))
+    (h₂ : ∀ s s', r s s' → ¬ b s → ¬ b' s' → couple r' (sem c₂ s) (sem c₂' s')) :
+    ⦃couple r⦄ Cmd.ite b c₁ c₂ ~ Cmd.ite b' c₁' c₂' ⦃couple r'⦄ :=
+  quad_couple_lift fun s s' hr => by
+    by_cases hb : b s
+    · have hb' : b' s' := (hguard s s' hr).mp hb
+      rw [sem_ite_pos hb, sem_ite_pos hb']
+      exact h₁ s s' hr hb hb'
+    · have hb' : ¬ b' s' := fun h => hb ((hguard s s' hr).mpr h)
+      rw [sem_ite_neg hb, sem_ite_neg hb']
+      exact h₂ s s' hr hb hb'
+
+/-- Synchronized choice couples branchwise — note the postcondition needs no
+`⊕`: the union of the branch couplings is a coupling of the unions. -/
+theorem quad_choice_couple {r r' : State → State → Prop} {c₁ c₂ c₁' c₂' : Cmd}
+    (h₁ : ∀ s s', r s s' → couple r' (sem c₁ s) (sem c₁' s'))
+    (h₂ : ∀ s s', r s s' → couple r' (sem c₂ s) (sem c₂' s')) :
+    ⦃couple r⦄ Cmd.choice c₁ c₂ ~ Cmd.choice c₁' c₂' ⦃couple r'⦄ :=
+  quad_couple_lift fun s s' hr => by
+    rw [sem_choice, sem_choice]
+    exact couple_union (h₁ s s' hr) (h₂ s s' hr)
+
+/-- One-sided choice: the passive side pairs with both branches — the coupling
+analogue of `quad_choice_left`, sound by idempotence of `∪`. -/
+theorem quad_choice_left_couple {r r' : State → State → Prop} {c₁ c₂ c' : Cmd}
+    (h₁ : ∀ s s', r s s' → couple r' (sem c₁ s) (sem c' s'))
+    (h₂ : ∀ s s', r s s' → couple r' (sem c₂ s) (sem c' s')) :
+    ⦃couple r⦄ Cmd.choice c₁ c₂ ~ c' ⦃couple r'⦄ :=
+  quad_couple_lift fun s s' hr => by
+    rw [sem_choice, ← Set.union_self (sem c' s')]
+    exact couple_union (h₁ s s' hr) (h₂ s s' hr)
+
+/-- **Coupled While**: guard-synchronized loops with per-state-coupled bodies
+couple, with no fuel, no `⊕ ⊤`, and no termination side condition. -/
+theorem quad_while_couple {r : State → State → Prop} {b b' : State → Prop}
+    {c c' : Cmd}
+    (hguard : ∀ s s', r s s' → (b s ↔ b' s'))
+    (hbody : ∀ s s', r s s' → b s → b' s' → couple r (sem c s) (sem c' s')) :
+    ⦃couple r⦄ Cmd.while b c ~ Cmd.while b' c'
+      ⦃couple fun t t' => r t t' ∧ ¬ b t ∧ ¬ b' t'⦄ :=
+  quad_couple_lift fun s s' hr => by
+    rw [sem_while, sem_while]
+    exact loopSem_couple hguard hbody s s' hr
 
 end RelOL
