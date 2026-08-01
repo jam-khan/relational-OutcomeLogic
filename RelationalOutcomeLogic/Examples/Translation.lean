@@ -100,4 +100,23 @@ theorem correct_translation {s : StC} (hrange : InRange s)
     Int.emod_eq_of_lt h0 hno]
   exact atom_singleton_iff.mpr rfl
 
+/-- **The singleton-pre pattern, dissolved**: under the coupling model the
+same functional post holds over the precondition covering *all* in-range,
+non-overflowing stores at once — `couple_bind` turns the per-store obligation
+of `correct_translation` into one quadruple. -/
+theorem correct_translation_general :
+    quadH (couple fun s a => a = .ok s ∧ InRange s ∧ s "x" + s "y" < WORD)
+      cProg rProg (couple fun t b => b = .ok t) :=
+  quadH_couple_lift fun s a ⟨ha, hrange, hno⟩ => by
+    subst ha
+    have h0 : (0 : Int) ≤ s "x" + s "y" := by
+      obtain ⟨h1, -, h3, -⟩ := hrange
+      omega
+    rw [errK_ok,
+      show semR rProg s = {Except.ok (Function.update s "x" (s "x" + s "y"))} from
+        semR_addAssign_ok hno,
+      show semC cProg s = {Function.update s "x" ((s "x" + s "y") % WORD)} from rfl,
+      Int.emod_eq_of_lt h0 hno]
+    exact couple_singleton_iff.mpr rfl
+
 end RelOL

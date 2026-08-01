@@ -1,4 +1,5 @@
 import RelationalOutcomeLogic.Quadruple
+import RelationalOutcomeLogic.Coupling
 
 /-!
 # Heterogeneous execution models: a C-like and a Rust-like fragment
@@ -451,5 +452,141 @@ theorem quadH_addAssign_panic (x y : String) :
   obtain ⟨rfl, hge⟩ := hall s hs a ha
   rw [errK_ok, semR_addAssign_err (by omega), Set.mem_singleton_iff] at hb
   exact hb
+
+/-! ## Coupling layer
+
+The heterogeneous coupling axioms ride on `couple_bind` exactly like the
+homogeneous rules — and get *shorter* than their `atom` counterparts, because
+the pairing replaces the separate nonemptiness bookkeeping. The `a = .ok s`
+conjunct of the `atom` preconditions was always a hand-rolled coupling; here
+it becomes the coupling relation itself. -/
+
+/-- Per-state couplings lift to heterogeneous quadruples over arbitrary
+`couple` preconditions. -/
+theorem quadH_couple_lift {r r' : StC → Except Unit StR → Prop}
+    {c : CmdC} {c' : CmdR}
+    (h : ∀ s a, r s a → couple r' (semC c s) (errK (semR c') a)) :
+    quadH (couple r) c c' (couple r') :=
+  fun _ _ hm => couple_bind hm h
+
+theorem quadH_skip_couple :
+    quadH (couple fun s a => a = .ok s) .skip .skip
+      (couple fun t b => b = .ok t) :=
+  quadH_couple_lift fun s a ha => by
+    subst ha
+    rw [errK_ok]
+    exact couple_singleton_iff.mpr rfl
+
+theorem quadH_assign_couple (x : String) (e : StC → Int) :
+    quadH (couple fun s a => a = .ok s) (.assign x e) (.assign x e)
+      (couple fun t b => b = .ok t) :=
+  quadH_couple_lift fun s a ha => by
+    subst ha
+    rw [errK_ok]
+    exact couple_singleton_iff.mpr rfl
+
+theorem quadH_addAssign_ok_couple (x y : String) :
+    quadH (couple fun s a => a = .ok s ∧ 0 ≤ s x + s y ∧ s x + s y < WORD)
+      (.addAssign x y) (.addAssign x y) (couple fun t b => b = .ok t) :=
+  quadH_couple_lift fun s a ⟨ha, h0, hlt⟩ => by
+    subst ha
+    rw [errK_ok, semR_addAssign_ok hlt, semC_addAssign, Int.emod_eq_of_lt h0 hlt]
+    exact couple_singleton_iff.mpr rfl
+
+theorem quadH_addAssign_panic_couple (x y : String) :
+    quadH (couple fun s a => a = .ok s ∧ WORD ≤ s x + s y)
+      (.addAssign x y) (.addAssign x y) (couple fun _ b => b = .error ()) :=
+  quadH_couple_lift fun s a ⟨ha, hge⟩ => by
+    subst ha
+    rw [errK_ok, semR_addAssign_err (by omega), semC_addAssign]
+    exact couple_singleton_iff.mpr rfl
+
+/-- **Coupled heterogeneous loops** (ok-preserving case): a plain loop on the
+C-like side couples with an error-propagating loop on the Rust-like side,
+provided the coupled body never panics. Panic-crossing loops are handled by
+exhaustive certificates instead (`translation_loop_bug`). -/
+theorem loopSem_errLoopSem_couple {ε σ : Type*} {r : StC → σ → Prop}
+    {b : StC → Prop} {b' : σ → Prop}
+    {step : StC → Set StC} {step' : σ → Set (Except ε σ)}
+    (hguard : ∀ x u, r x u → (b x ↔ b' u))
+    (hbody : ∀ x u, r x u → b x → b' u →
+      couple (fun t a => ∃ v, a = .ok v ∧ r t v) (step x) (step' u)) :
+    ∀ x u, r x u →
+      couple (fun t a => ∃ v, a = .ok v ∧ r t v ∧ ¬ b t ∧ ¬ b' v)
+        (loopSem b step x) (errLoopSem b' step' u) := by
+  have auxL : ∀ n x u, r x u → ∀ t ∈ loopIter b step n x,
+      ∃ a ∈ errLoopSem b' step' u, ∃ v, a = .ok v ∧ r t v ∧ ¬ b t ∧ ¬ b' v := by
+    intro n
+    induction n with
+    | zero =>
+      intro x u _ t ht
+      rw [loopIter_zero] at ht
+      exact absurd ht (Set.notMem_empty t)
+    | succ n ih =>
+      intro x u hr t ht
+      by_cases hb : b x
+      · have hb' : b' u := (hguard x u hr).mp hb
+        rw [loopIter_succ_pos hb] at ht
+        obtain ⟨w, hw, ht⟩ := mem_kleisli.mp ht
+        obtain ⟨a₁, ha₁, v, rfl, hrv⟩ := (hbody x u hr hb hb').1 w hw
+        obtain ⟨a, ha, hprop⟩ := ih w v hrv t ht
+        refine ⟨a, ?_, hprop⟩
+        rw [errLoopSem_pos hb']
+        exact mem_kleisli.mpr ⟨.ok v, ha₁, by rwa [errK_ok]⟩
+      · have hb' : ¬ b' u := fun h => hb ((hguard x u hr).mpr h)
+        rw [loopIter_succ_neg hb, Set.mem_singleton_iff] at ht
+        subst ht
+        refine ⟨.ok u, ?_, u, rfl, hr, hb, hb'⟩
+        rw [errLoopSem_neg hb']
+        exact Set.mem_singleton _
+  have auxR : ∀ n x u, r x u → ∀ a ∈ errLoopIter b' step' n u,
+      ∃ t ∈ loopSem b step x, ∃ v, a = .ok v ∧ r t v ∧ ¬ b t ∧ ¬ b' v := by
+    intro n
+    induction n with
+    | zero =>
+      intro x u _ a ha
+      rw [errLoopIter_zero] at ha
+      exact absurd ha (Set.notMem_empty a)
+    | succ n ih =>
+      intro x u hr a ha
+      by_cases hb' : b' u
+      · have hb : b x := (hguard x u hr).mpr hb'
+        rw [errLoopIter_succ_pos hb'] at ha
+        obtain ⟨a₁, ha₁, ha⟩ := mem_kleisli.mp ha
+        obtain ⟨w, hw, v, rfl, hrv⟩ := (hbody x u hr hb hb').2 a₁ ha₁
+        rw [errK_ok] at ha
+        obtain ⟨t, ht, hprop⟩ := ih w v hrv a ha
+        refine ⟨t, ?_, hprop⟩
+        rw [loopSem_unfold, if_pos hb]
+        exact mem_kleisli.mpr ⟨w, hw, ht⟩
+      · have hb : ¬ b x := fun h => hb' ((hguard x u hr).mp h)
+        rw [errLoopIter_succ_neg hb', Set.mem_singleton_iff] at ha
+        subst ha
+        refine ⟨x, ?_, u, rfl, hr, hb, hb'⟩
+        rw [loopSem_unfold, if_neg hb]
+        exact Set.mem_singleton x
+  intro x u hr
+  constructor
+  · intro t ht
+    obtain ⟨n, ht⟩ := Set.mem_iUnion.mp ht
+    obtain ⟨a, ha, hprop⟩ := auxL n x u hr t ht
+    exact ⟨a, ha, hprop⟩
+  · intro a ha
+    obtain ⟨n, ha⟩ := Set.mem_iUnion.mp ha
+    obtain ⟨t, ht, hprop⟩ := auxR n x u hr a ha
+    exact ⟨t, ht, hprop⟩
+
+/-- Coupled While across the two execution models, entered via `ok`. -/
+theorem quadH_while_couple {r : StC → StR → Prop} {b : StC → Prop}
+    {b' : StR → Prop} {c : CmdC} {c' : CmdR}
+    (hguard : ∀ s u, r s u → (b s ↔ b' u))
+    (hbody : ∀ s u, r s u → b s → b' u →
+      couple (fun t a => ∃ v, a = .ok v ∧ r t v) (semC c s) (semR c' u)) :
+    quadH (couple fun s a => ∃ u, a = .ok u ∧ r s u) (.while b c) (.while b' c')
+      (couple fun t a => ∃ v, a = .ok v ∧ r t v ∧ ¬ b t ∧ ¬ b' v) :=
+  quadH_couple_lift fun s a ⟨u, ha, hr⟩ => by
+    subst ha
+    rw [errK_ok, semC_while, semR_while]
+    exact loopSem_errLoopSem_couple hguard hbody s u hr
 
 end RelOL

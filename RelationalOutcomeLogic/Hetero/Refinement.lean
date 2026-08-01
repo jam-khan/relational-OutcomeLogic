@@ -28,4 +28,17 @@ theorem refines_assign (x : String) (v : Int) :
   subst ht
   exact rfl
 
+/-- Refinement **is** a family of left-total couplings: the ∀∃ property the
+product model could only refute is positively expressible in the coupling
+model. -/
+theorem refines_iff_coupleL {c : CmdC} {c' : CmdR} :
+    refines c c' ↔ ∀ s : StC, InRange s →
+      coupleL (fun t b => b = .ok t) (semC c s) (semR c' s) := by
+  constructor
+  · intro h s hs t ht
+    exact ⟨.ok t, h s hs t ht, rfl⟩
+  · intro h s hs t ht
+    obtain ⟨b, hb, rfl⟩ := h s hs t ht
+    exact hb
+
 end RelOL
