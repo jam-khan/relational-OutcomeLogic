@@ -14,6 +14,7 @@ import RelationalOutcomeLogic.Subsumption.RHL
 import RelationalOutcomeLogic.Examples.NI
 import RelationalOutcomeLogic.Examples.NILoop
 import RelationalOutcomeLogic.Examples.GNI
+import RelationalOutcomeLogic.Examples.NICouple
 import RelationalOutcomeLogic.Hetero.Lang
 import RelationalOutcomeLogic.Hetero.Refinement
 import RelationalOutcomeLogic.Examples.Translation
