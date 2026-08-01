@@ -159,4 +159,20 @@ theorem lowerBug_loop_not_correct : ¬ lowered lowerBug thrLoop zSt := by
   rw [hrel] at hi1
   simp [zSt] at hi1
 
+/-! ## Bitotal pass, instantiated
+
+The coupling-strength correctness statement (`loweredC`) has no singleton
+precondition, so one theorem per program covers all clear-flag entries at
+once — including the throwing loop, whose `loweredW` form was the best the
+product model could state. -/
+
+theorem lower_okProg_couple : loweredC lower okProg :=
+  lower_correct_couple _ (by simp [okProg])
+
+theorem lower_thrProg_couple : loweredC lower thrProg :=
+  lower_correct_couple _ (by simp [thrProg])
+
+theorem lower_thrLoop_couple : loweredC lower thrLoop :=
+  lower_correct_couple _ (by simp [thrLoop])
+
 end RelOL

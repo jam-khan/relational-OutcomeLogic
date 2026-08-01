@@ -242,4 +242,190 @@ theorem lower_correct (c : CmdS) (hc : Wf c) (s : State) (hs : s "err" = 0) :
   intro a ha u' hu'
   exact lowRel_of_lowInv a u' (lower_sim c hc s hs a ha u' hu')
 
+/-! ## The bitotal pass (coupling model)
+
+`lower_sim` is a ∀∀ simulation; upgrading it to a bitotal coupling needs
+exactly one more ingredient: **equi-termination** — source and target
+produce outcomes from the same initial stores. Since `CmdS` and the
+`lower`-image are deterministic, outcome sets are `∅`-or-inhabited together,
+and `couple_of_atomW_nonempty` assembles the coupling from the ∀∀ simulation
+plus the termination transfer. -/
+
+/-- **Equi-termination**: from a clear-flag store, a well-formed source
+program has an outcome iff its lowering does. The while case transfers fuel
+in both directions: an in-body exception makes the source exit with `error`
+while the guarded target exits its loop with the flag set. -/
+theorem lower_terminates (c : CmdS) (hwf : Wf c) : ∀ s : State, s "err" = 0 →
+    ((semS c s).Nonempty ↔ (sem (lower c) s).Nonempty) := by
+  induction c with
+  | skip => exact fun s _ => ⟨fun _ => ⟨s, rfl⟩, fun _ => ⟨.ok s, rfl⟩⟩
+  | assign x e =>
+    exact fun s _ => ⟨fun _ => ⟨_, rfl⟩, fun _ => ⟨_, rfl⟩⟩
+  | throw =>
+    exact fun s _ => ⟨fun _ => ⟨_, rfl⟩, fun _ => ⟨_, rfl⟩⟩
+  | seq c₁ c₂ ih₁ ih₂ =>
+    intro s hs
+    constructor
+    · rintro ⟨a, ha⟩
+      rw [semS_seq] at ha
+      obtain ⟨a₁, ha₁, ha⟩ := mem_kleisli.mp ha
+      obtain ⟨v, hv⟩ := (ih₁ hwf.1 s hs).mp ⟨a₁, ha₁⟩
+      have hinv₁ := lower_sim c₁ hwf.1 s hs a₁ ha₁ v hv
+      cases a₁ with
+      | ok u =>
+        obtain ⟨rfl, hu⟩ := hinv₁
+        rw [errK_ok] at ha
+        obtain ⟨u₂, hu₂⟩ := (ih₂ hwf.2 v hu).mp ⟨a, ha⟩
+        refine ⟨u₂, ?_⟩
+        simp only [lower]
+        rw [sem_seq]
+        refine mem_kleisli.mpr ⟨v, hv, ?_⟩
+        rw [sem_ite_pos (b := fun t => t "err" = 0) (s := v) hu]
+        exact hu₂
+      | error te =>
+        obtain ⟨rfl, hte⟩ := hinv₁
+        refine ⟨Function.update te "err" 1, ?_⟩
+        simp only [lower]
+        rw [sem_seq]
+        refine mem_kleisli.mpr ⟨_, hv, ?_⟩
+        rw [sem_ite_neg (b := fun t => t "err" = 0)
+          (s := Function.update te "err" 1) (by simp)]
+        rw [sem_skip]
+        exact rfl
+    · rintro ⟨u', hu'⟩
+      simp only [lower] at hu'
+      rw [sem_seq] at hu'
+      obtain ⟨v, hv, hu'⟩ := mem_kleisli.mp hu'
+      obtain ⟨a₁, ha₁⟩ := (ih₁ hwf.1 s hs).mpr ⟨v, hv⟩
+      have hinv₁ := lower_sim c₁ hwf.1 s hs a₁ ha₁ v hv
+      cases a₁ with
+      | ok u =>
+        obtain ⟨rfl, hu⟩ := hinv₁
+        rw [sem_ite_pos (b := fun t => t "err" = 0) (s := v) hu] at hu'
+        obtain ⟨a₂, ha₂⟩ := (ih₂ hwf.2 v hu).mpr ⟨u', hu'⟩
+        refine ⟨a₂, ?_⟩
+        rw [semS_seq]
+        exact mem_kleisli.mpr ⟨.ok v, ha₁, by rwa [errK_ok]⟩
+      | error te =>
+        refine ⟨.error te, ?_⟩
+        rw [semS_seq]
+        exact mem_kleisli.mpr ⟨.error te, ha₁, by rw [errK_error]; exact rfl⟩
+  | «while» b c ih =>
+    have auxA : ∀ n (s : State), s "err" = 0 →
+        (errLoopIter b (semS c) n s).Nonempty →
+        (loopSem (fun t => b t ∧ t "err" = 0) (sem (lower c)) s).Nonempty := by
+      intro n
+      induction n with
+      | zero =>
+        intro s _ h
+        rw [errLoopIter_zero] at h
+        exact absurd h Set.not_nonempty_empty
+      | succ n ihn =>
+        intro s hs h
+        by_cases hb : b s
+        · rw [errLoopIter_succ_pos hb] at h
+          obtain ⟨a, ha⟩ := h
+          obtain ⟨a₁, ha₁, ha⟩ := mem_kleisli.mp ha
+          obtain ⟨v, hv⟩ := (ih hwf s hs).mp ⟨a₁, ha₁⟩
+          have hinv₁ := lower_sim c hwf s hs a₁ ha₁ v hv
+          cases a₁ with
+          | ok u =>
+            obtain ⟨rfl, hu⟩ := hinv₁
+            rw [errK_ok] at ha
+            obtain ⟨w, hw⟩ := ihn v hu ⟨a, ha⟩
+            refine ⟨w, ?_⟩
+            rw [loopSem_unfold, if_pos ⟨hb, hs⟩]
+            exact mem_kleisli.mpr ⟨v, hv, hw⟩
+          | error te =>
+            obtain ⟨rfl, hte⟩ := hinv₁
+            refine ⟨Function.update te "err" 1, ?_⟩
+            rw [loopSem_unfold, if_pos ⟨hb, hs⟩]
+            refine mem_kleisli.mpr ⟨_, hv, ?_⟩
+            rw [loopSem_unfold, if_neg (by simp)]
+            exact rfl
+        · refine ⟨s, ?_⟩
+          rw [loopSem_unfold, if_neg (fun hcon => hb hcon.1)]
+          exact rfl
+    have auxB : ∀ k (s : State), s "err" = 0 →
+        (loopIter (fun t => b t ∧ t "err" = 0) (sem (lower c)) k s).Nonempty →
+        (errLoopSem b (semS c) s).Nonempty := by
+      intro k
+      induction k with
+      | zero =>
+        intro s _ h
+        rw [loopIter_zero] at h
+        exact absurd h Set.not_nonempty_empty
+      | succ k ihk =>
+        intro s hs h
+        by_cases hb : b s
+        · rw [loopIter_succ_pos (b := fun t => b t ∧ t "err" = 0) (s := s)
+            ⟨hb, hs⟩] at h
+          obtain ⟨w, hw⟩ := h
+          obtain ⟨v, hv, hw⟩ := mem_kleisli.mp hw
+          obtain ⟨a₁, ha₁⟩ := (ih hwf s hs).mpr ⟨v, hv⟩
+          have hinv₁ := lower_sim c hwf s hs a₁ ha₁ v hv
+          cases a₁ with
+          | ok u =>
+            obtain ⟨rfl, hu⟩ := hinv₁
+            obtain ⟨a, ha⟩ := ihk v hu ⟨w, hw⟩
+            refine ⟨a, ?_⟩
+            rw [errLoopSem_pos hb]
+            exact mem_kleisli.mpr ⟨.ok v, ha₁, by rwa [errK_ok]⟩
+          | error te =>
+            refine ⟨.error te, ?_⟩
+            rw [errLoopSem_pos hb]
+            exact mem_kleisli.mpr ⟨.error te, ha₁, by rw [errK_error]; exact rfl⟩
+        · refine ⟨.ok s, ?_⟩
+          rw [errLoopSem_neg hb]
+          exact rfl
+    intro s hs
+    constructor
+    · rintro ⟨a, ha⟩
+      rw [semS_while] at ha
+      obtain ⟨n, ha⟩ := Set.mem_iUnion.mp ha
+      have hres := auxA n s hs ⟨a, ha⟩
+      simpa only [lower, sem_while] using hres
+    · rintro ⟨u', hu'⟩
+      simp only [lower] at hu'
+      rw [sem_while] at hu'
+      obtain ⟨k, hu'⟩ := Set.mem_iUnion.mp hu'
+      have hres := auxB k s hs ⟨u', hu'⟩
+      rwa [semS_while]
+
+/-- **Bitotal correspondence per initial store**: the ∀∀ simulation
+(`lower_sim`) plus equi-termination (`lower_terminates`) assemble into a
+coupling — every source outcome has a matching target outcome and vice
+versa, and jointly divergent runs couple trivially. -/
+theorem lower_couple (c : CmdS) (hwf : Wf c) (s : State) (hs : s "err" = 0) :
+    couple lowInv (semS c s) (sem (lower c) s) := by
+  rcases Set.eq_empty_or_nonempty (semS c s) with hemp | hne
+  · have hemp' : sem (lower c) s = ∅ := by
+      rw [← Set.not_nonempty_iff_eq_empty]
+      intro hne'
+      have hcon := (lower_terminates c hwf s hs).mpr hne'
+      rw [hemp] at hcon
+      exact Set.not_nonempty_empty hcon
+    rw [hemp, hemp']
+    exact couple_empty _
+  · exact couple_of_atomW_nonempty
+      (fun a ha u' hu' => lower_sim c hwf s hs a ha u' hu')
+      ⟨fun _ => (lower_terminates c hwf s hs).mp hne, fun _ => hne⟩
+
+/-- Coupling-strength compilation correctness, with a **general
+precondition**: any coupling pairing source entries `.ok t'` with clear-flag
+target stores `t'` — no singleton anywhere in the statement. -/
+def loweredC (comp : CmdS → Cmd) (c : CmdS) : Prop :=
+  quadSem (semLiftS c) (semLift (comp c))
+    (couple fun a t' => a = .ok t' ∧ t' "err" = 0) (couple lowRel)
+
+/-- **The bitotal verified pass**: for every well-formed source program, the
+guarded lowering satisfies the coupling-strength correctness statement over
+arbitrary preconditions — `couple_bind` lifts the per-store bitotal
+correspondence `lower_couple`. -/
+theorem lower_correct_couple (c : CmdS) (hwf : Wf c) : loweredC lower c :=
+  fun _ _ hm => couple_bind hm fun a t' ⟨ha, ht'⟩ => by
+    subst ha
+    rw [errK_ok]
+    exact couple_mono lowRel_of_lowInv _ _ (lower_couple c hwf t' ht')
+
 end RelOL
