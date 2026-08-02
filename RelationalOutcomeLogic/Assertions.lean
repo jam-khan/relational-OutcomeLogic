@@ -112,13 +112,16 @@ variable {α β : Type*}
 -- Relational outcome assertions: predicates over pairs of outcome sets.
 def RAssn (α β : Type*) := Set α → Set β → Prop
 
--- `Relational` atom
--- basic way to state a relation between
--- two program's outcomes
---
--- note: non-emptyness is added to avoid
--- vacuous proof when either `program` diverges
--- and gives a `∅` outcome, as `∀ x ∈ ∅, ..` holds vacuously.
+/-
+  `Relational` atom
+
+  Basic way to state a relation between
+  two program's outcomes
+
+  Note: non-emptyness is added to avoid
+    vacuous proof when either `program` diverges
+    and gives a `∅` outcome, as `∀ x ∈ ∅, ..` holds vacuously.
+-/
 def atom (r : α → β → Prop) : RAssn α β :=
   fun m m' =>
     -- 1) `Joint reachability` both programs
@@ -127,3 +130,256 @@ def atom (r : α → β → Prop) : RAssn α β :=
     -- 2) `Cross-product` condition: every
     -- left outcome relates to every right outcome.
     ∧ ∀ x ∈ m, ∀ y ∈ m', r x y
+
+/-
+  `Weak relational atom`
+
+  Why do we need this even though it has no `reachability` guarantees?
+
+  1. `atom` is used for `certificates (under-approximate)`, it must not be vacuous.
+  2. Partial-correctness specs (over-approximate) must **not** be falsified by divergence,
+  so here `atomW` is going to be used.
+
+  This is analogous to `Partial correctness`.
+
+  This is the assertion we can use when relating
+  two `diverging` programs, just using `atom`
+  will not allow for reasoning/relating two
+  diverging program as it holds reachability.
+
+  This is not going to be used for some `existential`
+  statement, where we state some `buggy` state is reachable
+  because it can be used to state `vacuous` proof, so `atom`
+  shall be used instead.
+
+  Below is mainly used for embedding/subsumption of `Benton's RHL`
+  and compiler correctness (E.g., divering program compiles to divering program).
+-/
+def atomW (r : α → β → Prop) : RAssn α β :=
+  fun m m' =>
+    ∀ x ∈ m, ∀ y ∈ m', r x y
+
+/-- Pairwise `outcome conjunction/⊕` : both sides split simultaneously (overlap-friendly)
+
+  This allows for splitting two sets at once.
+
+  Concrete example:
+    Both programs flip a coin:
+
+    m  = ⟦x := 1 + x := 2⟧(s)  = {s[x ↦ 1],  s[x ↦ 2]}   (Program 1)
+    m' = ⟦y := 1 + y := 2⟧(s') = {s'[y ↦ 1], s'[y ↦ 2]}  (Program 2)
+
+  Plain atom `⌈x = y⌉` FAILS on (m, m').
+
+  - Why? It demands both cross pair agree, so (x ↦ 1, y ↦ 2) fails.
+
+    m₁ = {s[x ↦ 1]}, m₂ = {s[x ↦ 2]}, m₁' = {s'[y ↦ 1]}, m₂' = {s'[y ↦ 2]}
+
+  gives (m₁, m₁') ⊨ ⌈x = y⌉
+  and   (m₂, m₂') ⊨ ⌈x = y⌉
+
+  Hence, `(m, m') ⊨ ⌈x = y⌉ ⊕ ⌈x = y⌉`
+
+  Note: PIECES NEED NOT BE DISJOINT
+
+  - We can write set of outcomes as union
+  of itself and then, do the split `m' = m' ∪ m'`.
+
+  Later, this fact will come in handly for `Choice-L` rule
+  which allows for left program to branch, and right program
+  to just self-split to pair with both branches. Pretty cool!
+
+  If we had disjointness ingrained, then this will rule will
+  not be false, as between two programs where only one branches,
+  we won't be able to reason.
+
+  Difference from unary OL outcome conjunction `⊕` splits one
+  set into part where `P` holds and the part where `Q` holds,
+  but relational outcome conjunction needs to decide which one
+  is the correct right-`piece` for each left-`piece` to correspond.
+
+  `Synchronization` needs to be taken care of.
+-/
+def oplus (P Q : RAssn α β) : RAssn α β :=
+  fun m m' =>
+    ∃ m₁ m₂ m₁' m₂',
+      m = m₁ ∪ m₂ ∧ m' = m₁' ∪ m₂' ∧ P m₁ m₁' ∧ Q m₂ m₂'
+
+-- Trivial relational assertion (holds for anything)
+def rtop : RAssn α β := fun _ _ => True
+
+-- Relational `⊤ ⊕ ⊤`: joint divergence - no outcomes on either side.
+def rempty : RAssn α β := fun m m' => m = ∅ ∧ m' = ∅
+
+-- Entailment of relational assertion
+def entail (P Q : RAssn α β) : Prop := ∀ m m', P m m' → Q m m'
+
+/-
+  Swap the two sides (used by the `Sym` rule, swaps the carriers
+  ,so it stays well-typed heterogeneously).
+-/
+def RAssn.swap (R : RAssn α β) : RAssn β α := fun m m' => R m' m
+
+@[inherit_doc] scoped infixr:60 " ⊕ₒ " => oplus
+
+-- Helper lemmas
+
+@[simp] theorem atom_singleton_iff
+  {r : α → β → Prop} {a : α} {b : β} :
+    atom r {a} {b} ↔ r a b := by
+  simp [atom]
+
+theorem atom_pair_elim
+  {r : α → β → Prop} {m m'} (h : atom r m m') {x y} (hx : x ∈ m) (hy : y ∈ m') :
+    r x y := by
+  unfold atom at h
+  apply h.2.2 <;> assumption
+
+theorem oplus_intro
+  {P Q : RAssn α β} {m₁ m₂ m₁' m₂'} (h₁ : P m₁ m₁') (h₂ : Q m₂ m₂') :
+    (P ⊕ₒ Q) (m₁ ∪ m₂) (m₁' ∪ m₂') := by
+  unfold oplus
+  exists m₁
+  exists m₂
+  exists m₁'
+  exists m₂'
+
+-- `P ⟹ P ⊕  ⊤` via trivial split `(m ∪ ∅, m' ∪ ∅)`.
+theorem oplus_left_top
+  {P : RAssn α β} {m m'} (h : P m m') :
+    (P ⊕ₒ rtop) m m' := by
+  unfold oplus
+  exists m
+  exists ∅
+  exists m'
+  exists ∅
+  constructor <;> try simp
+  · constructor <;> try simp
+    · assumption
+    · unfold rtop <;> grind
+
+-- `(P ⟹ P') → (Q ⟹ Q') → (P ⊕ₒ Q ⟹ P' ⊕ₒ Q')`
+theorem oplus_mono {P P' Q Q' : RAssn α β} (hP : entail P P') (hQ : entail Q Q') :
+    entail (P ⊕ₒ Q) (P' ⊕ₒ Q') := by
+  unfold entail
+  rintro m m' ⟨m₁, m₂, m₁', m₂', rfl, rfl, h₁, h₂⟩
+  unfold oplus
+  unfold entail at hQ
+  exists m₁
+  exists m₂
+  exists m₁'
+  exists m₂'
+  simp
+  constructor
+  · apply hP
+    assumption
+  · apply hQ
+    assumption
+
+theorem oplus_comm {P Q : RAssn α β} : entail (P ⊕ₒ Q) (Q ⊕ₒ P) := by
+  rintro m m' ⟨m₁, m₂, m₁', m₂', rfl, rfl, h₁, h₂⟩
+  exact ⟨m₂, m₁, m₂', m₁', Set.union_comm .., Set.union_comm .., h₂, h₁⟩
+
+theorem oplus_assoc {P Q R : RAssn α β} : entail ((P ⊕ₒ Q) ⊕ₒ R) (P ⊕ₒ (Q ⊕ₒ R)) := by
+  rintro m m' ⟨m₁₂, m₃, m₁₂', m₃', rfl, rfl, ⟨m₁, m₂, m₁', m₂', rfl, rfl, h₁, h₂⟩, h₃⟩
+  exact ⟨m₁, m₂ ∪ m₃, m₁', m₂' ∪ m₃', Set.union_assoc .., Set.union_assoc .., h₁,
+    oplus_intro h₂ h₃⟩
+
+/-
+  Reachability extraction: an under-approximate relational atomic claim
+`atom r ⊕ ⊤` guarantees a *witness pair* of jointly reachable outcomes related
+by `r`. This is the engine behind the relational Principle of Denial.
+
+It is essentially saying:
+```
+  If you can prove f you can prove ⌈r⌉ ⊕ ⊤
+  about a pair of programs' outcomes,
+  then a real, reachable pair of outcomes
+  satisfying r actually exists.
+```
+
+The refutation pipeline:
+  1. prove a TRUE quadruple  ⟨pre⟩ c ~ c' ⟨⌈bad⌉ ⊕ ⊤⟩   (the certificate)
+  2. rel_true_positives extracts a jointly reachable pair satisfying `bad`
+  3. `bad` contradicts the spec's post, and `pre` is satisfiable
+  ⟹ denial: the spec's quadruple is FALSE.
+
+Correctness denied by exhibiting a proof, not by failing to find one.
+-/
+theorem rel_true_positives
+  {r : α → β → Prop} {m m'} (h : (atom r ⊕ₒ rtop) m m') :
+    ∃ x ∈ m, ∃ y ∈ m', r x y := by
+  obtain ⟨m₁, m₂, m₁', m₂', rfl, rfl, ⟨⟨x, hx⟩, ⟨y, hy⟩, hall⟩, -⟩ := h
+  exact ⟨x, Set.mem_union_left _ hx, y, Set.mem_union_left _ hy, hall x hx y hy⟩
+
+/-- `⊕ ⊤` certificates are monotone under enlarging the outcome sets: the new
+outcomes go into the `⊤` part. This is what lets a certificate proved on a
+fuel-truncated loop transfer to the full loop. -/
+theorem oplus_top_mono
+  {S : RAssn α β} {m₀ m : Set α} {m₀' m' : Set β}
+  (h : (S ⊕ₒ rtop) m₀ m₀') (hm : m₀ ⊆ m) (hm' : m₀' ⊆ m') :
+    (S ⊕ₒ rtop) m m' := by
+  obtain ⟨m₁, m₂, m₁', m₂', rfl, rfl, hS, -⟩ := h
+  exact ⟨m₁, m, m₁', m',
+    (Set.union_eq_self_of_subset_left (Set.subset_union_left.trans hm)).symm,
+    (Set.union_eq_self_of_subset_left (Set.subset_union_left.trans hm')).symm,
+    hS, trivial⟩
+
+-- `Weak-atom` (`atomW`) helper lemmas
+
+-- `atom` is essentially `atomW` plus joint reachability
+theorem atom_iff_atomW
+  {r : α → β → Prop} {m : Set α} {m' : Set β} :
+    atom r m m' ↔ m.Nonempty ∧ m'.Nonempty ∧ atomW r m m' := by
+  exact Eq.to_iff rfl
+
+-- `atom` entails `atomW`
+theorem atomW_of_atom
+  {r : α → β → Prop} :
+    entail (atom r) (atomW r) := by
+  unfold entail
+  intro m m' h1
+  unfold atom at h1
+  unfold atomW
+  grind
+
+@[simp] theorem atomW_singleton_iff
+  {r : α → β → Prop} {a : α} {b : β} :
+    atomW r {a} {b} ↔ r a b := by
+  simp [atomW]
+
+-- `atomW r ⟹ atomW r'`
+theorem atomW_mono
+  {r r' : α → β → Prop} (h : ∀ x y, r x y → r' x y) :
+    entail (atomW r) (atomW r') := by
+  unfold atomW
+  unfold entail
+  simp
+  intro m m' h1 x hx y hy
+  apply h x y
+  grind
+
+@[simp] theorem atomW_empty_left
+  (r : α → β → Prop) (m' : Set β) :
+    atomW r ∅ m' := by
+  simp [atomW]
+
+@[simp] theorem atomW_empty_right
+  (r : α → β → Prop) (m : Set α) :
+    atomW r m ∅ := by
+  simp [atomW]
+
+-- Swap helper lemmas
+
+@[simp] theorem RAssn.swap_swap
+  (R : RAssn α β) :
+    R.swap.swap = R := rfl
+
+theorem RAssn.swap_oplus
+  (P Q : RAssn α β) :
+    (P ⊕ₒ Q).swap = (P.swap ⊕ₒ Q.swap) := by
+  funext m' m
+  unfold RAssn.swap oplus
+  grind
+
+end RelOL
