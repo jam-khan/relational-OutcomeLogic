@@ -154,7 +154,7 @@ theorem loopIter_succ_pos
   {b : α → Prop} {s : α} (h : ¬ b s) (step : α → Set α) (n : ℕ) :
     loopIter b step (n + 1) s = {s} := by
   unfold loopIter
-  simp; intro h'; grind
+  simp only [ite_eq_right_iff]; intro h'; grind
 
 
 @[simp] theorem loopIter_mono_succ

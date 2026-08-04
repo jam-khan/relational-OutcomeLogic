@@ -222,6 +222,22 @@ def RAssn.swap (R : RAssn α β) : RAssn β α := fun m m' => R m' m
 
 @[inherit_doc] scoped infixr:60 " ⊕ₒ " => oplus
 
+/-! ## Notation
+
+Reading kit, matching the paper:
+  `⌈r⌉`      product atom (joint reachability + ∀∀)
+  `⌈r⌉ʷ`     weak atom (∀∀ only, divergence-tolerant)
+  `⊤ₒ`       trivial assertion
+  `P ⟹ₒ Q`   entailment
+  `Rᵀ`       swap (exchanges the carriers)
+All scoped to `RelOL`, so they never leak into importing files. -/
+
+scoped notation "⌈" r "⌉" => atom r
+scoped notation "⌈" r "⌉ʷ" => atomW r
+scoped notation "⊤ₒ" => rtop
+scoped infixr:25 " ⟹ₒ " => entail
+scoped postfix:max "ᵀ" => RAssn.swap
+
 -- Helper lemmas
 
 @[simp] theorem atom_singleton_iff
@@ -253,10 +269,10 @@ theorem oplus_left_top
   exists ∅
   exists m'
   exists ∅
-  constructor <;> try simp
+  constructor <;> try simp only [Set.union_empty, true_and]
   · constructor <;> try simp
     · assumption
-    · unfold rtop <;> grind
+    · unfold rtop; grind
 
 -- `(P ⟹ P') → (Q ⟹ Q') → (P ⊕ₒ Q ⟹ P' ⊕ₒ Q')`
 theorem oplus_mono {P P' Q Q' : RAssn α β} (hP : entail P P') (hQ : entail Q Q') :
@@ -269,7 +285,7 @@ theorem oplus_mono {P P' Q Q' : RAssn α β} (hP : entail P P') (hQ : entail Q Q
   exists m₂
   exists m₁'
   exists m₂'
-  simp
+  simp only [true_and]
   constructor
   · apply hP
     assumption
@@ -354,10 +370,8 @@ theorem atomW_mono
     entail (atomW r) (atomW r') := by
   unfold atomW
   unfold entail
-  simp
   intro m m' h1 x hx y hy
-  apply h x y
-  grind
+  exact h x y (h1 x hx y hy)
 
 @[simp] theorem atomW_empty_left
   (r : α → β → Prop) (m' : Set β) :

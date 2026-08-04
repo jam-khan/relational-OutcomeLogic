@@ -37,6 +37,125 @@ inductive Cmd where
   | choice (c₁ c₂ : Cmd)
   | while (b : State → Prop) (c : Cmd)
 
+/-! ## Program notation (scoped to `RelOL`)
+
+  `SKIP`                        no-op
+  `x ::= e`                     assignment (e is a program expression, see below)
+  `c₁ ;; c₂`                    sequencing
+  `c₁ + c₂`                     nondeterministic choice
+  `IF b THEN c₁ ELSE c₂ END`    conditional (b is a program guard, see below)
+  `WHILE b DO c END`            loop
+
+Assignment RHSs and guards are *program expressions*, not Lean lambdas: bare
+identifiers are program variables (`x` means `fun s => s "x"`), numerals are
+constants, and `+ - *` / `= ≠ < ≤ > ≥ ∧ ∨ ¬` mean the obvious things. So
+
+  `x ::= 1`,  `y ::= x + 1`,  `WHILE i < n DO i ::= i + 1 END`
+
+all elaborate to the plain `Cmd.assign`/`Cmd.while` terms with the usual
+`fun s => …` functions inside — the sugar is macro-only, nothing new in the
+semantics. Escapes, for when a piece of the program is a Lean variable:
+
+  `↑x ::= ↑e`      assignment with `x : String`, `e : State → Int` in scope
+  `WHILE ↑b DO …`  guard from a Lean term `b : State → Prop`
+  `"x" ::= e`      the variable name as a string literal also works
+
+`⟦e⟧` / `⟦b⟧` turn a program expression / guard into a standalone
+`State → Int` / `State → Prop` term.
+
+Precedence: `::=` (70) > `+` (65) > `;;` (50), so
+`(x ::= e) + (x ::= e') ;; c` reads as `((x ::= e) + (x ::= e')) ;; c`.
+One trap: the RHS of `::=` is greedy, so choice branches need parens —
+`x ::= 1 + x ::= 2` is a parse error, write `(x ::= 1) + (x ::= 2)`. -/
+
+scoped notation "SKIP" => Cmd.skip
+scoped infixr:50 " ;; " => Cmd.seq
+scoped instance : Add Cmd := ⟨Cmd.choice⟩
+
+@[simp] theorem Cmd.add_def (c₁ c₂ : Cmd) : c₁ + c₂ = Cmd.choice c₁ c₂ := rfl
+
+/-- Program expressions (`Int`-valued): numerals, program variables, `+ - *`,
+and `↑t` to splice a Lean term `t : State → Int`. -/
+declare_syntax_cat rexp
+
+/-- Program guards (`Prop`-valued): comparisons of program expressions,
+`∧ ∨ ¬`, and `↑t` to splice a Lean term `t : State → Prop`. -/
+declare_syntax_cat rbexp
+
+syntax num : rexp
+syntax "-" num : rexp
+syntax ident : rexp
+syntax str : rexp
+syntax:65 rexp:65 " + " rexp:66 : rexp
+syntax:65 rexp:65 " - " rexp:66 : rexp
+syntax:70 rexp:70 " * " rexp:71 : rexp
+syntax "(" rexp ")" : rexp
+syntax "↑" term:max : rexp
+
+syntax:50 rexp:51 " = " rexp:51 : rbexp
+syntax:50 rexp:51 " ≠ " rexp:51 : rbexp
+syntax:50 rexp:51 " < " rexp:51 : rbexp
+syntax:50 rexp:51 " ≤ " rexp:51 : rbexp
+syntax:50 rexp:51 " > " rexp:51 : rbexp
+syntax:50 rexp:51 " ≥ " rexp:51 : rbexp
+syntax:35 rbexp:36 " ∧ " rbexp:35 : rbexp
+syntax:30 rbexp:31 " ∨ " rbexp:30 : rbexp
+syntax:40 "¬" rbexp:40 : rbexp
+syntax "(" rbexp ")" : rbexp
+syntax "↑" term:max : rbexp
+
+/-- (internal) value of the program expression in state `s`. -/
+syntax "rexp% " ident rexp : term
+/-- (internal) truth of the program guard in state `s`. -/
+syntax "rbexp% " ident rbexp : term
+
+macro_rules
+  | `(rexp% $_ $n:num)              => `(($n : Int))
+  | `(rexp% $_ -$n:num)             => `((-$n : Int))
+  | `(rexp% $s $x:ident)            => `($s $(Lean.quote x.getId.toString))
+  | `(rexp% $s $x:str)              => `($s $x)
+  | `(rexp% $s $a:rexp + $b:rexp)   => `((rexp% $s $a) + (rexp% $s $b))
+  | `(rexp% $s $a:rexp - $b:rexp)   => `((rexp% $s $a) - (rexp% $s $b))
+  | `(rexp% $s $a:rexp * $b:rexp)   => `((rexp% $s $a) * (rexp% $s $b))
+  | `(rexp% $s ($a:rexp))           => `(rexp% $s $a)
+  | `(rexp% $s ↑$t)                 => `(($t : State → Int) $s)
+
+macro_rules
+  | `(rbexp% $s $a:rexp = $b:rexp)  => `((rexp% $s $a) = (rexp% $s $b))
+  | `(rbexp% $s $a:rexp ≠ $b:rexp)  => `((rexp% $s $a) ≠ (rexp% $s $b))
+  | `(rbexp% $s $a:rexp < $b:rexp)  => `((rexp% $s $a) < (rexp% $s $b))
+  | `(rbexp% $s $a:rexp ≤ $b:rexp)  => `((rexp% $s $a) ≤ (rexp% $s $b))
+  | `(rbexp% $s $a:rexp > $b:rexp)  => `((rexp% $s $a) > (rexp% $s $b))
+  | `(rbexp% $s $a:rexp ≥ $b:rexp)  => `((rexp% $s $a) ≥ (rexp% $s $b))
+  | `(rbexp% $s $a:rbexp ∧ $b:rbexp) => `((rbexp% $s $a) ∧ (rbexp% $s $b))
+  | `(rbexp% $s $a:rbexp ∨ $b:rbexp) => `((rbexp% $s $a) ∨ (rbexp% $s $b))
+  | `(rbexp% $s ¬$a:rbexp)          => `(¬ (rbexp% $s $a))
+  | `(rbexp% $s ($a:rbexp))         => `(rbexp% $s $a)
+  | `(rbexp% $s ↑$t)                => `(($t : State → Prop) $s)
+
+scoped syntax "⟦" rexp "⟧" : term
+scoped syntax "⟦" rbexp "⟧" : term
+
+macro_rules
+  | `(⟦$e:rexp⟧)  => `((fun s => rexp% s $e : State → Int))
+  | `(⟦$b:rbexp⟧) => `((fun s => rbexp% s $b : State → Prop))
+
+scoped syntax:70 ident " ::= " rexp : term
+scoped syntax:70 str " ::= " rexp : term
+scoped syntax:70 "↑" term:max " ::= " rexp : term
+
+macro_rules
+  | `($x:ident ::= $e:rexp) => `(Cmd.assign $(Lean.quote x.getId.toString) ⟦$e:rexp⟧)
+  | `($x:str ::= $e:rexp)   => `(Cmd.assign $x ⟦$e:rexp⟧)
+  | `(↑$x ::= $e:rexp)      => `(Cmd.assign $x ⟦$e:rexp⟧)
+
+scoped syntax "IF " rbexp " THEN " term " ELSE " term " END" : term
+scoped syntax "WHILE " rbexp " DO " term " END" : term
+
+macro_rules
+  | `(IF $b:rbexp THEN $c₁ ELSE $c₂ END) => `(Cmd.ite ⟦$b:rbexp⟧ $c₁ $c₂)
+  | `(WHILE $b:rbexp DO $c END)          => `(Cmd.while ⟦$b:rbexp⟧ $c)
+
 open Classical in
 -- Denotational semantics: the set of possible final states.
 noncomputable def sem : Cmd → State → Set State
@@ -124,7 +243,7 @@ noncomputable def semLift (c : Cmd) : Set State → Set State :=
   (b : State → Prop) (c : Cmd) :
     sem (.while b c) = OrderHom.lfp (loopHom b (sem c)) := by
   funext s
-  simp
+  simp only [sem_while]
   rw [loopSem_eq_lfp]
 
 -- Divergence is the empty outcome set.
@@ -137,8 +256,8 @@ theorem sem_while_true_skip (s : State) :
   | zero      => simp
   | succ n ih =>
       rw [loopIter_succ_pos, sem_skip, kleisli_singleton]
-      exact ih s
-      grind
+      · exact ih s
+      · grind
 
 -- Loop-free fragment
 -- This reserves the Cmd to loopfree fragment

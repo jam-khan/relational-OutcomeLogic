@@ -3,3 +3,5 @@ Papers/
 paper/
 notes/main.pdf
 .DS_Store
+.claude/
+context.md
