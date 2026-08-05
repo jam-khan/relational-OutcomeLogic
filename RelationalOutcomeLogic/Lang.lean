@@ -156,6 +156,18 @@ macro_rules
   | `(IF $b:rbexp THEN $c₁ ELSE $c₂ END) => `(Cmd.ite ⟦$b:rbexp⟧ $c₁ $c₂)
   | `(WHILE $b:rbexp DO $c END)          => `(Cmd.while ⟦$b:rbexp⟧ $c)
 
+-- Fully-escaped forms elaborate straight to the constructors (`Cmd.assign x e`,
+-- not `Cmd.assign x (fun s => e s)`) so rule statements stay eta-noise-free.
+-- Declared after the general rules, hence tried first.
+macro_rules
+  | `($x:ident ::= ↑$t) => `(Cmd.assign $(Lean.quote x.getId.toString) ($t : State → Int))
+  | `($x:str ::= ↑$t)   => `(Cmd.assign $x ($t : State → Int))
+  | `(↑$x ::= ↑$t)      => `(Cmd.assign $x ($t : State → Int))
+
+macro_rules
+  | `(IF ↑$t THEN $c₁ ELSE $c₂ END) => `(Cmd.ite ($t : State → Prop) $c₁ $c₂)
+  | `(WHILE ↑$t DO $c END)          => `(Cmd.while ($t : State → Prop) $c)
+
 open Classical in
 -- Denotational semantics: the set of possible final states.
 noncomputable def sem : Cmd → State → Set State
