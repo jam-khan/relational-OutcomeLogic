@@ -177,68 +177,9 @@ theorem quad_split
     ⦃R₁ ⊕ₒ R₂⦄ c ~ c' ⦃S₁ ⊕ₒ S₂⦄ := by
   apply quadSem_split (semLift_union c) (semLift_union c') h₁ h₂
 
-/-!
-## Worked example: why Split is indispensable
-
-  `P  =  (x := 1  +  x := 2) ; y := x`, compared with itself.
-
-  The choice produces an ⊕-shaped mid-condition; the assignment after it
-  can only be handled by opening that ⊕ — and Split is the only rule that
-  can. Derivation (M₁ = ⌈x=1∧x'=1⌉, M₂ = ⌈x=2∧x'=2⌉, Sᵢ likewise for y):
-
-      d₁ (Asgn+Conseq)   d₂ (Asgn+Conseq)      e₁ (Asgn)   e₂ (Asgn)
-      ───────────────────────────── Choice     ──────────────────── Split
-      ⦃tt⦄ choice ~ choice ⦃M₁ ⊕ M₂⦄           ⦃M₁ ⊕ M₂⦄ y:=x ~ y:=x ⦃S₁ ⊕ S₂⦄
-      ──────────────────────────────────────────────────────────────── Seq
-                      ⦃tt⦄ P ~ P ⦃S₁ ⊕ S₂⦄
-
-  The `have`-blocks below mirror the tree nodes one-to-one. The leaves are
-  proved semantically inline; once `quad_choice_sync` and `quad_assign`
-  land, each collapses to a rule application. -/
-example :
-    ⦃⌈True⌉⦄
-      (x ::= 1) + (x ::= 2) ;; y ::= x
-      ~ (x ::= 1) + (x ::= 2) ;; y ::= x
-    ⦃⌈y = 1 ∧ y' = 1⌉ ⊕ₒ ⌈y = 2 ∧ y' = 2⌉⦄ := by
-  -- d₁ : first branch establishes M₁  (≡ Asgn axiom, upcoming `quad_assign`)
-  have d₁ : ⦃⌈True⌉⦄ x ::= 1 ~ x ::= 1 ⦃⌈x = 1 ∧ x' = 1⌉⦄ := by
-    rintro m m' ⟨⟨s, hs⟩, ⟨s', hs'⟩, -⟩
-    rw [semLift_assign, semLift_assign]
-    refine ⟨⟨_, Set.mem_image_of_mem _ hs⟩, ⟨_, Set.mem_image_of_mem _ hs'⟩, ?_⟩
-    rintro t ⟨u, hu, rfl⟩ t' ⟨u', hu', rfl⟩
-    simp
-  -- d₂ : second branch establishes M₂
-  have d₂ : ⦃⌈True⌉⦄ x ::= 2 ~ x ::= 2 ⦃⌈x = 2 ∧ x' = 2⌉⦄ := by
-    rintro m m' ⟨⟨s, hs⟩, ⟨s', hs'⟩, -⟩
-    rw [semLift_assign, semLift_assign]
-    refine ⟨⟨_, Set.mem_image_of_mem _ hs⟩, ⟨_, Set.mem_image_of_mem _ hs'⟩, ?_⟩
-    rintro t ⟨u, hu, rfl⟩ t' ⟨u', hu', rfl⟩
-    simp
-  -- Choice node: the ⊕ is BORN here  (≡ upcoming `quad_choice_sync`)
-  have hChoice : ⦃⌈True⌉⦄
-      (x ::= 1) + (x ::= 2) ~ (x ::= 1) + (x ::= 2)
-      ⦃⌈x = 1 ∧ x' = 1⌉ ⊕ₒ ⌈x = 2 ∧ x' = 2⌉⦄ := by
-    intro m m' hm
-    simp only [Cmd.add_def, semLift_choice]
-    exact oplus_intro (d₁ m m' hm) (d₂ m m' hm)
-  -- e₁ : uniform group x=1 through the assignment  (≡ Asgn axiom)
-  have e₁ : ⦃⌈x = 1 ∧ x' = 1⌉⦄ y ::= x ~ y ::= x ⦃⌈y = 1 ∧ y' = 1⌉⦄ := by
-    rintro m m' ⟨⟨s, hs⟩, ⟨s', hs'⟩, hall⟩
-    rw [semLift_assign, semLift_assign]
-    refine ⟨⟨_, Set.mem_image_of_mem _ hs⟩, ⟨_, Set.mem_image_of_mem _ hs'⟩, ?_⟩
-    rintro t ⟨u, hu, rfl⟩ t' ⟨u', hu', rfl⟩
-    simpa using hall u hu u' hu'
-  -- e₂ : uniform group x=2
-  have e₂ : ⦃⌈x = 2 ∧ x' = 2⌉⦄ y ::= x ~ y ::= x ⦃⌈y = 2 ∧ y' = 2⌉⦄ := by
-    rintro m m' ⟨⟨s, hs⟩, ⟨s', hs'⟩, hall⟩
-    rw [semLift_assign, semLift_assign]
-    refine ⟨⟨_, Set.mem_image_of_mem _ hs⟩, ⟨_, Set.mem_image_of_mem _ hs'⟩, ?_⟩
-    rintro t ⟨u, hu, rfl⟩ t' ⟨u', hu', rfl⟩
-    simpa using hall u hu u' hu'
-  -- Split node: the ⊕ is CONSUMED here — no other rule can open it
-  have hSplit := quad_split e₁ e₂
-  -- Seq node: glue the halves along the ⊕-shaped mid-condition
-  exact quad_seq hChoice hSplit
+-- Split is the ONLY ⊕-eliminator: once a Choice has produced an ⊕-shaped
+-- mid-condition, nothing else can open it. Worked derivation at the end of
+-- this file, after the rules it uses (Choice and Asgn) have landed.
 
 /-
     ⦃R⦄ c₁ ~ c₁' ⦃S₁⦄      ⦃R⦄ c₂ ~ c₂' ⦃S₂⦄
@@ -527,5 +468,54 @@ theorem quad_while_left {I : ℕ → RAssn State State} {b : State → Prop} {c 
     refine ih _ _ ?_
     have hb := hbody k m m' hm
     rwa [semLift_skip] at hb
+
+/-!
+## Worked example: why Split is indispensable
+
+  `P  =  (x := 1  +  x := 2) ;; y := x`, compared with itself.
+
+  The choice produces an ⊕-shaped mid-condition; the assignment after it
+  can only be handled by opening that ⊕ — and Split is the only rule that
+  can. Derivation (M₁ = ⌈x=1∧x'=1⌉, M₂ = ⌈x=2∧x'=2⌉, Sᵢ likewise for y):
+
+      d₁ (Asgn+Conseq)   d₂ (Asgn+Conseq)      e₁ (Asgn+Conseq)  e₂ (Asgn+Conseq)
+      ───────────────────────────── Choice     ──────────────────────────── Split
+      ⦃tt⦄ choice ~ choice ⦃M₁ ⊕ M₂⦄           ⦃M₁ ⊕ M₂⦄ y:=x ~ y:=x ⦃S₁ ⊕ S₂⦄
+      ──────────────────────────────────────────────────────────────── Seq
+                      ⦃tt⦄ P ~ P ⦃S₁ ⊕ S₂⦄
+
+  Every `have` is one node of that tree — no semantics anywhere. The leaves
+  are `Asgn + Conseq`: `quad_assign` hands back the Floyd precondition
+  (`r` pre-composed with the updates) and `quad_conseq` bridges from the
+  precondition we actually have, each bridge closing by `simp`. -/
+example :
+    ⦃⌈True⌉⦄
+      (x ::= 1) + (x ::= 2) ;; y ::= x
+      ~ (x ::= 1) + (x ::= 2) ;; y ::= x
+    ⦃⌈y = 1 ∧ y' = 1⌉ ⊕ₒ ⌈y = 2 ∧ y' = 2⌉⦄ := by
+  -- d₁ : first branch establishes M₁; Floyd-pre of `x ::= 1` is `1 = 1`, i.e. `True`
+  have d₁ : ⦃⌈True⌉⦄ x ::= 1 ~ x ::= 1 ⦃⌈x = 1 ∧ x' = 1⌉⦄ :=
+    quad_conseq (fun _ _ h => ⟨h.1, h.2.1, by simp⟩)
+      (quad_assign "x" "x" _ _) (fun _ _ h => h)
+  -- d₂ : second branch establishes M₂
+  have d₂ : ⦃⌈True⌉⦄ x ::= 2 ~ x ::= 2 ⦃⌈x = 2 ∧ x' = 2⌉⦄ :=
+    quad_conseq (fun _ _ h => ⟨h.1, h.2.1, by simp⟩)
+      (quad_assign "x" "x" _ _) (fun _ _ h => h)
+  -- Choice node: the ⊕ is BORN here
+  have hChoice := quad_choice_sync d₁ d₂
+  -- e₁ : uniform group x=1 through the assignment; Floyd-pre of `y ::= x` is `x = 1`
+  have e₁ : ⦃⌈x = 1 ∧ x' = 1⌉⦄ y ::= x ~ y ::= x ⦃⌈y = 1 ∧ y' = 1⌉⦄ :=
+    quad_conseq (fun _ _ h => ⟨h.1, h.2.1, fun s hs s' hs' => by
+        simpa using h.2.2 s hs s' hs'⟩)
+      (quad_assign "y" "y" _ _) (fun _ _ h => h)
+  -- e₂ : uniform group x=2
+  have e₂ : ⦃⌈x = 2 ∧ x' = 2⌉⦄ y ::= x ~ y ::= x ⦃⌈y = 2 ∧ y' = 2⌉⦄ :=
+    quad_conseq (fun _ _ h => ⟨h.1, h.2.1, fun s hs s' hs' => by
+        simpa using h.2.2 s hs s' hs'⟩)
+      (quad_assign "y" "y" _ _) (fun _ _ h => h)
+  -- Split node: the ⊕ is CONSUMED here — no other rule can open it
+  have hSplit := quad_split e₁ e₂
+  -- Seq node: glue the halves along the ⊕-shaped mid-condition
+  exact quad_seq hChoice hSplit
 
 end RelOL

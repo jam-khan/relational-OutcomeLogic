@@ -6,3 +6,4 @@ import RelationalOutcomeLogic.Lang
 import RelationalOutcomeLogic.Assertions
 import RelationalOutcomeLogic.Quadruple
 import RelationalOutcomeLogic.Rules
+import RelationalOutcomeLogic.Metatheory
