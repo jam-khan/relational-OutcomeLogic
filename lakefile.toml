@@ -5,6 +5,11 @@ defaultTargets = ["RelationalOutcomeLogic"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+# Off because the assertion brackets are overloaded (a program-guard form and a
+# term form). Lean tries both alternatives, and the discarded term one would
+# auto-bind program variables as implicits: `⌜p = 1⌝` left a phantom `{p : x}`
+# on the theorem. Mathlib style anyway.
+autoImplicit = false
 relaxedAutoImplicit = false
 weak.linter.mathlibStandardSet = true
 weak.linter.style.header = false

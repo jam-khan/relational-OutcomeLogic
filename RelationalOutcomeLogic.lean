@@ -7,3 +7,6 @@ import RelationalOutcomeLogic.Assertions
 import RelationalOutcomeLogic.Quadruple
 import RelationalOutcomeLogic.Rules
 import RelationalOutcomeLogic.Metatheory
+import RelationalOutcomeLogic.Unary.Assertions
+import RelationalOutcomeLogic.Unary.Triple
+import RelationalOutcomeLogic.Unary.Sanity

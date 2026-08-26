@@ -48,7 +48,9 @@ inductive Cmd where
 
 Assignment RHSs and guards are *program expressions*, not Lean lambdas: bare
 identifiers are program variables (`x` means `fun s => s "x"`), numerals are
-constants, and `+ - *` / `= ≠ < ≤ > ≥ ∧ ∨ ¬` mean the obvious things. So
+constants, `+ - *` / `= ≠ < ≤ > ≥ ∧ ∨ ¬` mean the obvious things, and a guard
+may also be the constant `True`/`False` (so `WHILE True DO SKIP END` is the
+diverging loop). So
 
   `x ::= 1`,  `y ::= x + 1`,  `WHILE i < n DO i ::= i + 1 END`
 
@@ -103,6 +105,10 @@ syntax:30 rbexp:31 " ∨ " rbexp:30 : rbexp
 syntax:40 "¬" rbexp:40 : rbexp
 syntax "(" rbexp ")" : rbexp
 syntax "↑" term:max : rbexp
+-- Carries the constant guards `True`/`False`. Must be `ident`, NOT the string
+-- literals `"True"`/`"False"` — those would make them global keyword tokens and
+-- break every other `True` in the file (`⌈True⌉` included).
+syntax ident : rbexp
 
 /-- (internal) value of the program expression in state `s`. -/
 syntax "rexp% " ident rexp : term
@@ -132,6 +138,11 @@ macro_rules
   | `(rbexp% $s ¬$a:rbexp)          => `(¬ (rbexp% $s $a))
   | `(rbexp% $s ($a:rbexp))         => `(rbexp% $s $a)
   | `(rbexp% $s ↑$t)                => `(($t : State → Prop) $s)
+  | `(rbexp% $_ $x:ident)           => do
+      -- only the constant guards; anything else is a Lean term, spell it `↑p`
+      if x.getId.eraseMacroScopes == `True then `(True)
+      else if x.getId.eraseMacroScopes == `False then `(False)
+      else Lean.Macro.throwUnsupported
 
 scoped syntax "⟦" rexp "⟧" : term
 scoped syntax "⟦" rbexp "⟧" : term
