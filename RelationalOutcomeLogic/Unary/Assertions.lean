@@ -47,6 +47,26 @@ def topU : Assn α := fun _ => True
 -- `⊤^⊕`: the assertion of divergence — no outcomes at all.
 def emptyU : Assn α := fun m => m = ∅
 
+-- Entailment between outcome assertions (the unary `⟹ₒ`).
+def entailsU (P Q : Assn α) : Prop := ∀ m, P m → Q m
+
+/-! ## Notation
+
+Reading kit, mirroring the relational one but subscripted `ᵤ` so the two can
+be opened at once (`Subsumption/OL.lean` does exactly that):
+  `P ⊕ᵤ Q`    outcome conjunction
+  `⊤ᵤ`        trivial assertion — a POST-only connective, see the note above
+  `∅ᵤ`        divergence (`⊤^⊕` in the paper)
+  `P ⟹ᵤ Q`    entailment
+The atomic bracket `⌜p⌝` needs the program-guard grammar from `Lang.lean`, so
+it lives in `Unary/Triple.lean` — same reason `⌈r⌉`'s two-state form lives in
+`Quadruple.lean` and not in `Assertions.lean`. -/
+
+scoped infixr:60 " ⊕ᵤ " => oplusU
+scoped notation "⊤ᵤ" => topU
+scoped notation "∅ᵤ" => emptyU
+scoped infixr:25 " ⟹ᵤ " => entailsU
+
 @[simp] theorem atomU_singleton
   {p : α → Prop} {x : α} :
     atomU p {x} ↔ p x := by
