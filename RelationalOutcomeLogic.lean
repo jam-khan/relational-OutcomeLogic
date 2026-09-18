@@ -1,4 +1,16 @@
 import RelationalOutcomeLogic.Basic
+import RelationalOutcomeLogic.Algebra.Weight
+import RelationalOutcomeLogic.Algebra.WeightOrder
+import RelationalOutcomeLogic.Algebra.WeightBoundary
+import RelationalOutcomeLogic.Prob.Assertions
+import RelationalOutcomeLogic.Prob.Coupling
+import RelationalOutcomeLogic.Prob.CouplingAssertions
+import RelationalOutcomeLogic.Prob.Support
+import RelationalOutcomeLogic.Prob.Examples
+import RelationalOutcomeLogic.Prob.EventMass
+import RelationalOutcomeLogic.Prob.Quadruple
+import RelationalOutcomeLogic.Prob.BugCert
+import RelationalOutcomeLogic.Prob.CertificateExamples
 import RelationalOutcomeLogic.Kleisli
 import RelationalOutcomeLogic.Lang
 import RelationalOutcomeLogic.Assertions
