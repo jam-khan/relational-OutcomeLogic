@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gate: full build + no sorry/admit anywhere in the library.
+# Gate: full build, no sorry/admit, standard axioms only.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -9,4 +9,5 @@ if grep -rn --include='*.lean' -E '\bsorry\b|\badmit\b' RelationalOutcomeLogic/ 
   echo "FAIL: sorry/admit found" >&2
   exit 1
 fi
-echo "OK: build green, no sorries"
+lake env lean scripts/AxiomGate.lean
+echo "OK: build green, no sorries, standard axioms only"

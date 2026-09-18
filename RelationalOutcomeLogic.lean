@@ -1,12 +1,25 @@
--- Root module of the redo. Add an import line here as each checklist step
--- lands, so `lake build` and `scripts/check.sh` gate everything built so far.
 import RelationalOutcomeLogic.Basic
 import RelationalOutcomeLogic.Kleisli
 import RelationalOutcomeLogic.Lang
 import RelationalOutcomeLogic.Assertions
+import RelationalOutcomeLogic.Coupling
 import RelationalOutcomeLogic.Quadruple
 import RelationalOutcomeLogic.Rules
 import RelationalOutcomeLogic.Metatheory
+import RelationalOutcomeLogic.BugCert
+import RelationalOutcomeLogic.Tactic.Symexec
 import RelationalOutcomeLogic.Unary.Assertions
 import RelationalOutcomeLogic.Unary.Triple
 import RelationalOutcomeLogic.Unary.Sanity
+import RelationalOutcomeLogic.Subsumption.OL
+import RelationalOutcomeLogic.Subsumption.RHL
+import RelationalOutcomeLogic.Hetero.Lang
+import RelationalOutcomeLogic.Hetero.Refinement
+import RelationalOutcomeLogic.Compiler.Lowering
+import RelationalOutcomeLogic.Examples.NI
+import RelationalOutcomeLogic.Examples.NILoop
+import RelationalOutcomeLogic.Examples.GNI
+import RelationalOutcomeLogic.Examples.NICouple
+import RelationalOutcomeLogic.Examples.Translation
+import RelationalOutcomeLogic.Examples.TranslationLoop
+import RelationalOutcomeLogic.Examples.Compiler

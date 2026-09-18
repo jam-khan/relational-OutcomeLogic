@@ -3,32 +3,18 @@ import RelationalOutcomeLogic.Basic
 import RelationalOutcomeLogic.Kleisli
 
 /-!
-  Simple `cwhile` like language and its powerset
-  semantics.
+# A nondeterministic while-language with powerset semantics
 
-  - `nondeterministic`
-  - `while` loops
-  - `power set` semantics
-
-  Note: this is an instance of OL semantics,
-  ideally we want generality beyond `power set`
-  semantics. For Relational Outcome Logic,
-  we begin with the `power set` for now.
-
-  Note: this is for `homogenous` setting,
-  `relOL` shall be capable of reasoning in
-  `heterogenous` language setting (two languages
-  with different semantics).
+Notation (scoped): `SKIP`, `x ::= e`, `c₁ ;; c₂`, `c₁ + c₂`, `IF b THEN c₁ ELSE c₂ END`,
+`WHILE b DO c END`. Expressions and guards are program expressions: identifiers are
+program variables, `↑t` splices a Lean term, `⟦e⟧` is the denoted function.
+Precedence: `::=` (70) > `+` (65) > `;;` (50); parenthesise choice branches.
 -/
 
 namespace RelOL
 
--- This allows for `State -> Prop` semantics
--- at the cost of assuming decidability deriving
--- from `classical axiom of choice`.
 attribute [local instance] Classical.propDecidable
 
--- Commands of the homogeneous language.
 inductive Cmd where
   | skip
   | assign (x : String) (e : State → Int)
@@ -37,51 +23,16 @@ inductive Cmd where
   | choice (c₁ c₂ : Cmd)
   | while (b : State → Prop) (c : Cmd)
 
-/-! ## Program notation (scoped to `RelOL`)
-
-  `SKIP`                        no-op
-  `x ::= e`                     assignment (e is a program expression, see below)
-  `c₁ ;; c₂`                    sequencing
-  `c₁ + c₂`                     nondeterministic choice
-  `IF b THEN c₁ ELSE c₂ END`    conditional (b is a program guard, see below)
-  `WHILE b DO c END`            loop
-
-Assignment RHSs and guards are *program expressions*, not Lean lambdas: bare
-identifiers are program variables (`x` means `fun s => s "x"`), numerals are
-constants, `+ - *` / `= ≠ < ≤ > ≥ ∧ ∨ ¬` mean the obvious things, and a guard
-may also be the constant `True`/`False` (so `WHILE True DO SKIP END` is the
-diverging loop). So
-
-  `x ::= 1`,  `y ::= x + 1`,  `WHILE i < n DO i ::= i + 1 END`
-
-all elaborate to the plain `Cmd.assign`/`Cmd.while` terms with the usual
-`fun s => …` functions inside — the sugar is macro-only, nothing new in the
-semantics. Escapes, for when a piece of the program is a Lean variable:
-
-  `↑x ::= ↑e`      assignment with `x : String`, `e : State → Int` in scope
-  `WHILE ↑b DO …`  guard from a Lean term `b : State → Prop`
-  `"x" ::= e`      the variable name as a string literal also works
-
-`⟦e⟧` / `⟦b⟧` turn a program expression / guard into a standalone
-`State → Int` / `State → Prop` term.
-
-Precedence: `::=` (70) > `+` (65) > `;;` (50), so
-`(x ::= e) + (x ::= e') ;; c` reads as `((x ::= e) + (x ::= e')) ;; c`.
-One trap: the RHS of `::=` is greedy, so choice branches need parens —
-`x ::= 1 + x ::= 2` is a parse error, write `(x ::= 1) + (x ::= 2)`. -/
-
 scoped notation "SKIP" => Cmd.skip
 scoped infixr:50 " ;; " => Cmd.seq
 scoped instance : Add Cmd := ⟨Cmd.choice⟩
 
 @[simp] theorem Cmd.add_def (c₁ c₂ : Cmd) : c₁ + c₂ = Cmd.choice c₁ c₂ := rfl
 
-/-- Program expressions (`Int`-valued): numerals, program variables, `+ - *`,
-and `↑t` to splice a Lean term `t : State → Int`. -/
+/-- Program expressions (`Int`-valued). -/
 declare_syntax_cat rexp
 
-/-- Program guards (`Prop`-valued): comparisons of program expressions,
-`∧ ∨ ¬`, and `↑t` to splice a Lean term `t : State → Prop`. -/
+/-- Program guards (`Prop`-valued). -/
 declare_syntax_cat rbexp
 
 syntax num : rexp
@@ -105,9 +56,7 @@ syntax:30 rbexp:31 " ∨ " rbexp:30 : rbexp
 syntax:40 "¬" rbexp:40 : rbexp
 syntax "(" rbexp ")" : rbexp
 syntax "↑" term:max : rbexp
--- Carries the constant guards `True`/`False`. Must be `ident`, NOT the string
--- literals `"True"`/`"False"` — those would make them global keyword tokens and
--- break every other `True` in the file (`⌈True⌉` included).
+-- constant guards `True`/`False` (as `ident`: string literals would become global keywords)
 syntax ident : rbexp
 
 /-- (internal) value of the program expression in state `s`. -/
@@ -139,7 +88,6 @@ macro_rules
   | `(rbexp% $s ($a:rbexp))         => `(rbexp% $s $a)
   | `(rbexp% $s ↑$t)                => `(($t : State → Prop) $s)
   | `(rbexp% $_ $x:ident)           => do
-      -- only the constant guards; anything else is a Lean term, spell it `↑p`
       if x.getId.eraseMacroScopes == `True then `(True)
       else if x.getId.eraseMacroScopes == `False then `(False)
       else Lean.Macro.throwUnsupported
@@ -167,9 +115,7 @@ macro_rules
   | `(IF $b:rbexp THEN $c₁ ELSE $c₂ END) => `(Cmd.ite ⟦$b:rbexp⟧ $c₁ $c₂)
   | `(WHILE $b:rbexp DO $c END)          => `(Cmd.while ⟦$b:rbexp⟧ $c)
 
--- Fully-escaped forms elaborate straight to the constructors (`Cmd.assign x e`,
--- not `Cmd.assign x (fun s => e s)`) so rule statements stay eta-noise-free.
--- Declared after the general rules, hence tried first.
+-- fully-escaped forms elaborate straight to the constructors (tried first)
 macro_rules
   | `($x:ident ::= ↑$t) => `(Cmd.assign $(Lean.quote x.getId.toString) ($t : State → Int))
   | `($x:str ::= ↑$t)   => `(Cmd.assign $x ($t : State → Int))
@@ -179,268 +125,161 @@ macro_rules
   | `(IF ↑$t THEN $c₁ ELSE $c₂ END) => `(Cmd.ite ($t : State → Prop) $c₁ $c₂)
   | `(WHILE ↑$t DO $c END)          => `(Cmd.while ($t : State → Prop) $c)
 
-open Classical in
--- Denotational semantics: the set of possible final states.
+/-- Denotational semantics: the set of possible final states (`∅` is divergence). -/
 noncomputable def sem : Cmd → State → Set State
-  | .skip, s          => {s}
-  | .assign x e, s    => {Function.update s x (e s)}
-  | .seq c₁ c₂, s     => kleisli (sem c₂) (sem c₁ s)
-  | .ite b c₁ c₂, s   => if b s then sem c₁ s else sem c₂ s
-  | .choice c₁ c₂, s  => sem c₁ s ∪ sem c₂ s
-  | .while b c, s     => loopSem b (sem c) s
+  | .skip, s => {s}
+  | .assign x e, s => {Function.update s x (e s)}
+  | .seq c₁ c₂, s => kleisli (sem c₂) (sem c₁ s)
+  | .ite b c₁ c₂, s => if b s then sem c₁ s else sem c₂ s
+  | .choice c₁ c₂, s => sem c₁ s ∪ sem c₂ s
+  | .while b c, s => loopSem b (sem c) s
 
--- lifting of semantics from `State to Set of States`
--- to `Set of States → Set of States` (Kleisli extension)
+/-- The lifted semantics the logic speaks about. -/
 noncomputable def semLift (c : Cmd) : Set State → Set State :=
   kleisli (sem c)
 
--- Some helper lemmas for `simplification`
--- Note: semantics are defined as `noncomputable`
--- so, below lemmas can help with proofs by `simplication`
--- instead of `computation`/`fixpoint`.
-@[simp] theorem sem_skip
-  (s : State) :
-    sem .skip s = {s} := by
-  rfl
+@[simp] theorem sem_skip (s : State) : sem .skip s = {s} := rfl
 
-@[simp] theorem sem_assign
-  (x : String) (e : State → Int) (s : State) :
-    sem (.assign x e) s = {Function.update s x (e s)} := by
-  rfl
+@[simp] theorem sem_assign (x : String) (e : State → Int) (s : State) :
+    sem (.assign x e) s = {Function.update s x (e s)} := rfl
 
-@[simp] theorem sem_seq
-  (c₁ c₂ : Cmd) (s : State) :
-    sem (.seq c₁ c₂) s = kleisli (sem c₂) (sem c₁ s) := by
-  rfl
+@[simp] theorem sem_seq (c₁ c₂ : Cmd) (s : State) :
+    sem (.seq c₁ c₂) s = kleisli (sem c₂) (sem c₁ s) := rfl
 
-@[simp] theorem sem_choice
-  (c₁ c₂ : Cmd) (s : State) :
-    sem (.choice c₁ c₂) s = sem c₁ s ∪ sem c₂ s := by
-  rfl
+@[simp] theorem sem_choice (c₁ c₂ : Cmd) (s : State) :
+    sem (.choice c₁ c₂) s = sem c₁ s ∪ sem c₂ s := rfl
 
-@[simp] theorem sem_ite_pos
-  {b : State → Prop} {s : State} (h : b s) (c₁ c₂ : Cmd) :
+@[simp] theorem sem_ite_pos {b : State → Prop} {s : State} (h : b s) (c₁ c₂ : Cmd) :
     sem (.ite b c₁ c₂) s = sem c₁ s := by
   simp only [sem, if_pos h]
 
-@[simp] theorem sem_ite_neg
-  {b : State → Prop} {s : State} (h : ¬ b s) (c₁ c₂ : Cmd) :
+@[simp] theorem sem_ite_neg {b : State → Prop} {s : State} (h : ¬ b s) (c₁ c₂ : Cmd) :
     sem (.ite b c₁ c₂) s = sem c₂ s := by
   simp only [sem, if_neg h]
 
--- Loops
-@[simp] theorem sem_while
-  (b : State → Prop) (c : Cmd) (s : State) :
+@[simp] theorem sem_while (b : State → Prop) (c : Cmd) (s : State) :
     sem (.while b c) s = loopSem b (sem c) s := rfl
 
-@[simp] theorem sem_while_unfold
-  (b : State → Prop) (c : Cmd) (s : State) :
-    sem (.while b c) s
-      = if b s then semLift (.while b c) (sem c s) else {s} := by
-  apply loopSem_unfold b (sem c) s
+theorem sem_while_unfold (b : State → Prop) (c : Cmd) (s : State) :
+    sem (.while b c) s = if b s then semLift (.while b c) (sem c s) else {s} :=
+  loopSem_unfold b (sem c) s
 
-@[simp] theorem sem_while_pos
-  {b : State → Prop} {s : State} (h : b s) (c : Cmd) :
+theorem sem_while_pos {b : State → Prop} {s : State} (h : b s) (c : Cmd) :
     sem (.while b c) s = semLift (.while b c) (sem c s) := by
-  rw [sem_while_unfold, if_pos]
-  assumption
+  rw [sem_while_unfold, if_pos h]
 
-@[simp] theorem sem_while_neg
-  {b : State → Prop} {s : State} (h : ¬ b s) (c : Cmd) :
+theorem sem_while_neg {b : State → Prop} {s : State} (h : ¬ b s) (c : Cmd) :
     sem (.while b c) s = {s} := by
   rw [sem_while_unfold, if_neg h]
 
-/-
-  Fuel based lemmas for `while` loop
--/
-@[simp] theorem loopIter_subset_sem
-  (b : State → Prop) (c : Cmd) (n : ℕ) (s : State) :
+theorem loopIter_subset_sem (b : State → Prop) (c : Cmd) (n : ℕ) (s : State) :
     loopIter b (sem c) n s ⊆ sem (.while b c) s :=
   loopIter_subset_loopSem b (sem c) n s
 
-/-
-  `while` is the least fixed point of its characteristic functional
-  (Knaster–Tarski reading; regression pin for the loop semantics).
--/
-@[simp] theorem sem_while_eq_lfp
-  (b : State → Prop) (c : Cmd) :
+theorem sem_while_eq_lfp (b : State → Prop) (c : Cmd) :
     sem (.while b c) = OrderHom.lfp (loopHom b (sem c)) := by
   funext s
-  simp only [sem_while]
-  rw [loopSem_eq_lfp]
+  rw [sem_while, loopSem_eq_lfp]
 
--- Divergence is the empty outcome set.
-theorem sem_while_true_skip (s : State) :
-    sem (.while (fun _ => True) .skip) s = ∅ := by
+/-- Divergence is the empty outcome set. -/
+theorem sem_while_true (c : Cmd) (s : State) : sem (.while (fun _ => True) c) s = ∅ := by
   rw [sem_while]
-  unfold loopSem
   refine Set.eq_empty_of_subset_empty (Set.iUnion_subset fun n => ?_)
   induction n generalizing s with
-  | zero      => simp
+  | zero => simp
   | succ n ih =>
-      rw [loopIter_succ_pos, sem_skip, kleisli_singleton]
-      · exact ih s
-      · grind
+    rw [loopIter_succ_pos trivial]
+    intro t ht
+    obtain ⟨u, -, hu⟩ := mem_kleisli.mp ht
+    exact ih u hu
 
--- Loop-free fragment
--- This reserves the Cmd to loopfree fragment
--- allows for more properties to be stated
--- ideally all things possible with the loop fragment
+theorem sem_while_true_skip (s : State) : sem (.while (fun _ => True) .skip) s = ∅ :=
+  sem_while_true .skip s
+
 @[simp] def LoopFree : Cmd → Prop
-  | .skip         => True
-  | .assign _ _   => True
-  | .seq c₁ c₂    => LoopFree c₁ ∧ LoopFree c₂
-  | .ite _ c₁ c₂  => LoopFree c₁ ∧ LoopFree c₂
+  | .skip => True
+  | .assign _ _ => True
+  | .seq c₁ c₂ => LoopFree c₁ ∧ LoopFree c₂
+  | .ite _ c₁ c₂ => LoopFree c₁ ∧ LoopFree c₂
   | .choice c₁ c₂ => LoopFree c₁ ∧ LoopFree c₂
-  | .while _ _    => False
+  | .while _ _ => False
 
--- `Loop-free` fragment shall not diverge
--- as main cause of divergence appears
--- due to `loops`
--- This means every `command` must have
--- atleast one outcome from every state.
-theorem sem_nonempty
-  {c : Cmd} (hc : LoopFree c) (s : State) :
-    (sem c s).Nonempty := by
+/-- Loop-free commands never diverge. -/
+theorem sem_nonempty {c : Cmd} (hc : LoopFree c) (s : State) : (sem c s).Nonempty := by
   induction c generalizing s with
-  | skip       => exact Set.nonempty_of_mem rfl
-  | assign x e => exact Set.nonempty_of_mem rfl
-  | seq c₁ c₂ ih₁ ih₂ =>
-      rw [sem_seq]
-      cases hc
-      apply kleisli_nonempty <;> grind
+  | skip => exact ⟨s, rfl⟩
+  | assign x e => exact ⟨_, rfl⟩
+  | seq c₁ c₂ ih₁ ih₂ => exact kleisli_nonempty (ih₁ hc.1 s) fun t _ => ih₂ hc.2 t
   | ite b c₁ c₂ ih₁ ih₂ =>
-      by_cases h : b s
-      · rw [sem_ite_pos h c₁ c₂]
-        apply ih₁ hc.1
-      · rw [sem_ite_neg h c₁ c₂]
-        apply ih₂ hc.2
-  | choice c₁ c₂ ih₁ ih₂ =>
-      rw [sem_choice]
-      rw [@Set.union_nonempty]
-      left
-      apply ih₁ hc.1
-  | «while» b c ih =>
-      by_cases h : b s
-      · rw [sem_while_pos h c]
-        exact Set.nonempty_iff_ne_empty.mpr fun a ↦ hc
-      · rw [sem_while_neg h c]
-        exact Set.singleton_nonempty s
+    by_cases h : b s
+    · rw [sem_ite_pos h]; exact ih₁ hc.1 s
+    · rw [sem_ite_neg h]; exact ih₂ hc.2 s
+  | choice c₁ c₂ ih₁ ih₂ => exact (ih₁ hc.1 s).inl
+  | «while» b c ih => exact hc.elim
 
-/-
-lifting lemmas, derived from `kleisli`
+/-! ## Lifted semantics -/
 
-Why do we need these?
-  kleisli based semantics are not used by the logic
-  directly, rather `lifting : Power set → Power set`
-  is used, hence we need below lemmas for the `semLift`
+@[simp] theorem mem_semLift {c : Cmd} {m : Set State} {t : State} :
+    t ∈ semLift c m ↔ ∃ s ∈ m, t ∈ sem c s := mem_kleisli
 
-sem c     : State → Set State   -- program semantics (`Kleisli` arrow)
-semLift c : Set State → Set State -- = kleisli (sem c), `lifting`
-quad (logic) : assertions over the semantic lifting
+@[simp] theorem semLift_empty (c : Cmd) : semLift c ∅ = ∅ := kleisli_empty _
 
-Hence, we derive below for the `lifting` based on the `sem`
--/
-@[simp] theorem mem_semLift
-  {c : Cmd} {m : Set State} {t : State} :
-    t ∈ semLift c m ↔ ∃ s ∈ m, t ∈ sem c s :=
-  mem_kleisli
-
-@[simp] theorem semLift_empty
-  (c : Cmd) :
-    semLift c ∅ = ∅ := kleisli_empty _
-
-@[simp] theorem semLift_singleton
-  (c : Cmd) (s : State) :
-    semLift c {s} = sem c s :=
+@[simp] theorem semLift_singleton (c : Cmd) (s : State) : semLift c {s} = sem c s :=
   kleisli_singleton _ _
 
-@[simp] theorem semLift_skip
-  (m : Set State) :
-    semLift .skip m = m := by
+@[simp] theorem semLift_skip (m : Set State) : semLift .skip m = m := by
   ext t; simp
 
-@[simp] theorem semLift_union
-  (c : Cmd) (m₁ m₂ : Set State) :
-    semLift c (m₁ ∪ m₂) = semLift c m₁ ∪ semLift c m₂ := by
-  ext t; simp [semLift]
+@[simp] theorem semLift_union (c : Cmd) (m₁ m₂ : Set State) :
+    semLift c (m₁ ∪ m₂) = semLift c m₁ ∪ semLift c m₂ :=
+  kleisli_union _ _ _
 
-@[simp] theorem semLift_seq
-  (c₁ c₂ : Cmd) (m : Set State) :
+@[simp] theorem semLift_seq (c₁ c₂ : Cmd) (m : Set State) :
     semLift (.seq c₁ c₂) m = semLift c₂ (semLift c₁ m) :=
   (kleisli_comp (sem c₁) (sem c₂) m).symm
 
-@[simp] theorem semLift_choice
-  (c₁ c₂ : Cmd) (m : Set State) :
+@[simp] theorem semLift_choice (c₁ c₂ : Cmd) (m : Set State) :
     semLift (.choice c₁ c₂) m = semLift c₁ m ∪ semLift c₂ m :=
   kleisli_pointwise_union (sem c₁) (sem c₂) m
 
-@[simp] theorem semLift_nonempty
-  {c : Cmd} (hc : LoopFree c) {m : Set State} (hm : m.Nonempty) :
-    (semLift c m).Nonempty := by
-  unfold semLift
-  refine kleisli_nonempty hm ?_
-  exact fun x a ↦ sem_nonempty hc x
+theorem semLift_nonempty {c : Cmd} (hc : LoopFree c) {m : Set State} (hm : m.Nonempty) :
+    (semLift c m).Nonempty :=
+  kleisli_nonempty hm fun s _ => sem_nonempty hc s
 
-/-
-  Set-level computation lemmas for the structured rules
-
-  These are used for the structural rules later.
--/
-
--- `⟦x := e⟧†(m) = { s[x ↦ e(s)] | s ∈ m}`
-@[simp] theorem semLift_assign
-  (x : String) (e : State → Int) (m : Set State) :
+@[simp] theorem semLift_assign (x : String) (e : State → Int) (m : Set State) :
     semLift (.assign x e) m = (fun s => Function.update s x (e s)) '' m := by
   ext t
   simp [Set.mem_image, eq_comm]
 
--- `(∀ s ∈ m, b(s)) → ⟦if b then c₁ else c₂⟧†(m) = ⟦c₁⟧†(m)`
-@[simp] theorem semLift_ite_pos
-  {b : State → Prop} {m : Set State} (h : ∀ s ∈ m, b s) (c₁ c₂ : Cmd) :
-    semLift (.ite b c₁ c₂) m = semLift c₁ m := by
-  unfold semLift
-  refine kleisli_congr ?_
-  intro x hx
-  by_cases h' : b x
-  · exact sem_ite_pos (h x hx) c₁ c₂
-  · exact sem_ite_pos (h x hx) c₁ c₂
+theorem semLift_ite_pos {b : State → Prop} {m : Set State} (h : ∀ s ∈ m, b s) (c₁ c₂ : Cmd) :
+    semLift (.ite b c₁ c₂) m = semLift c₁ m :=
+  kleisli_congr fun s hs => sem_ite_pos (h s hs) c₁ c₂
 
--- `(∀ s ∈ m, ¬ b(s)) → ⟦if b then c₁ else c₂⟧†(m) = ⟦c₂⟧†(m)`
-@[simp] theorem semLift_ite_neg
-  {b : State → Prop} {m : Set State} (h : ∀ s ∈ m, ¬ b s) (c₁ c₂ : Cmd) :
-    semLift (.ite b c₁ c₂) m = semLift c₂ m := by
-  unfold semLift
-  refine kleisli_congr ?_
-  intro x hx
-  by_cases h' : b x
-  · exact sem_ite_neg (h x hx) c₁ c₂
-  · exact sem_ite_neg (h x hx) c₁ c₂
+theorem semLift_ite_neg {b : State → Prop} {m : Set State} (h : ∀ s ∈ m, ¬ b s) (c₁ c₂ : Cmd) :
+    semLift (.ite b c₁ c₂) m = semLift c₂ m :=
+  kleisli_congr fun s hs => sem_ite_neg (h s hs) c₁ c₂
 
--- On a set where the guard fails uniformly, the loop is the identity.
-@[simp] theorem semLift_while_neg
-  {b : State → Prop} {m : Set State} (h : ∀ s ∈ m, ¬ b s) (c : Cmd) :
+theorem semLift_while_neg {b : State → Prop} {m : Set State} (h : ∀ s ∈ m, ¬ b s) (c : Cmd) :
     semLift (.while b c) m = m := by
   rw [semLift, kleisli_congr fun s hs => sem_while_neg (h s hs) c]
   ext t
-  simp [mem_kleisli]
+  simp
 
-@[simp] theorem semLift_while_pos
-  {b : State → Prop} {m : Set State} (h : ∀ s ∈ m, b s) (c : Cmd) :
+theorem semLift_while_pos {b : State → Prop} {m : Set State} (h : ∀ s ∈ m, b s) (c : Cmd) :
     semLift (.while b c) m = semLift (.while b c) (semLift c m) := by
-  rw [semLift, kleisli_congr fun s hs => sem_while_pos (h s hs) c]
-  rw [semLift, semLift, kleisli_comp]
+  rw [semLift, kleisli_congr fun s hs => sem_while_pos (h s hs) c, semLift, semLift, kleisli_comp]
 
--- `while b c` and it's one step un-roll are equivalent
-@[simp] theorem sem_while_eq_unroll
-  (b : State → Prop) (c : Cmd) :
+/-- A loop is its one-step unrolling. -/
+theorem sem_while_eq_unroll (b : State → Prop) (c : Cmd) :
     sem (.while b c) = sem (.ite b (.seq c (.while b c)) .skip) := by
-  funext s -- f ~> f s
-  by_cases h' : b s
-  · rw [sem_while_pos h' c, semLift, sem]
-    simp; grind
-  · rw [sem_while_neg h' c]
-    rw [sem]
-    simp; grind
+  funext s
+  by_cases h : b s
+  · rw [sem_while_pos h, sem_ite_pos h, sem_seq, semLift]
+  · rw [sem_while_neg h, sem_ite_neg h, sem_skip]
+
+theorem semLift_while_eq_unroll (b : State → Prop) (c : Cmd) :
+    semLift (.while b c) = semLift (.ite b (.seq c (.while b c)) .skip) := by
+  unfold semLift
+  rw [← sem_while_eq_unroll]
 
 end RelOL

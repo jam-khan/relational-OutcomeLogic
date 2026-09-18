@@ -2,46 +2,27 @@ import RelationalOutcomeLogic.Lang
 import RelationalOutcomeLogic.Assertions
 
 /-!
-  # Relational Outcome Logic Quadruple `⟨P⟩ c ~ c' ⟨S⟩`
+# The quadruple `⦃R⦄ c ~ c' ⦃S⦄`
+
+`⟪R⟫ F , G ⟪S⟫` is the semantic judgment over arbitrary lifts (language-independent).
+`⌈…⌉` and `⌈…⌉ʷ` also accept two-state program assertions: unprimed variables read the
+left state, primed ones the right, e.g. `⌈y = 1 ∧ y' = 1⌉`.
 -/
 
 namespace RelOL
 
 variable {α β γ δ : Type*}
 
--- Semantic relational quadruple over abstract lift functions.
 def quadSem (F : Set α → Set γ) (G : Set β → Set δ) (R : RAssn α β) (S : RAssn γ δ) : Prop :=
   ∀ m m', R m m' → S (F m) (G m')
 
-/-- Homogeneous (same-language) Relational Outcome Logic quadruple. -/
 def quad (R : RAssn State State) (c c' : Cmd) (S : RAssn State State) : Prop :=
   quadSem (semLift c) (semLift c') R S
 
--- Program slots parse at level 50 so `;;`-chains (infixr:50) fit without parens:
--- `⦃R⦄ c₁ ;; c₂ ~ c' ⦃S⦄` works.
-@[inherit_doc] scoped notation:50 "⦃" R "⦄ " c:50 " ~ " c':50 " ⦃" S "⦄" => quad R c c' S
-
-/-- Semantic quadruple, displayed with the lifts between the brackets:
-`⟪R⟫ F , G ⟪S⟫` is `quadSem F G R S`. -/
+scoped notation:50 "⦃" R "⦄ " c:50 " ~ " c':50 " ⦃" S "⦄" => quad R c c' S
 scoped notation:50 "⟪" R "⟫ " F:51 " , " G:51 " ⟪" S "⟫" => quadSem F G R S
 
-/-! ## Relational assertion sugar
-
-`⌈…⌉` (and `⌈…⌉ʷ`) also accept a *two-state* program expression, with the
-prime convention from the paper: an unprimed variable reads the LEFT state, a
-primed one the RIGHT. So
-
-  `⌈y = 1 ∧ y' = 1⌉`   is   `atom (fun s s' => s "y" = 1 ∧ s' "y" = 1)`
-  `⌈True⌉`             is   `atom (fun _ _ => True)`
-
-Same grammar as guards otherwise (numerals, `+ - *`, comparisons, `∧ ∨ ¬`),
-plus `↑r` to splice a Lean term `r : State → State → Prop` (or, inside an
-expression, `↑e` with `e : State → State → Int`). The term forms
-`⌈fun s s' => …⌉` keep working — anything the sugar can't parse falls back to
-the plain notation from `Assertions.lean`. -/
-
-/-- Two-state program expressions: like `rexp`, but `x` reads the left state
-and `x'` the right. -/
+/-- Two-state program expressions: `x` reads the left state, `x'` the right. -/
 declare_syntax_cat rrexp
 
 /-- Two-state assertions on program expressions (the `⌈…⌉` sugar). -/
@@ -101,8 +82,7 @@ macro_rules
   | `(rassn% $s $s' ¬$a:rassn) => `(¬ (rassn% $s $s' $a))
   | `(rassn% $s $s' ($a:rassn)) => `(rassn% $s $s' $a)
   | `(rassn% $_ $_ $x:ident) => do
-      -- bare idents are only the constant assertions; anything else falls back
-      -- to the term form of `⌈…⌉` (e.g. `⌈r⌉` with `r` a Lean relation).
+      -- only the constants; anything else falls back to the term form `⌈r⌉`
       if x.getId.eraseMacroScopes == `True then `(True)
       else if x.getId.eraseMacroScopes == `False then `(False)
       else Lean.Macro.throwUnsupported
@@ -114,9 +94,5 @@ scoped syntax "⌈" rassn "⌉ʷ" : term
 macro_rules
   | `(⌈$a:rassn⌉)  => `(atom (fun s s' => rassn% s s' $a))
   | `(⌈$a:rassn⌉ʷ) => `(atomW (fun s s' => rassn% s s' $a))
-
--- Example
-theorem quad_skip (R : RAssn State State) : ⦃R⦄ SKIP ~ SKIP ⦃R⦄ := by
-  rw [quad, quadSem]; simp
 
 end RelOL

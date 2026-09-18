@@ -1,34 +1,14 @@
 import RelationalOutcomeLogic.Rules
 
-/-!
-# Relational Hoare Logic is the weak-atom fragment of RelOL
-
-`rhl r c c' r'` is the Benton-style relational Hoare judgment in its
-partial-correctness, ∀∀ reading (every pair of terminating runs from
-`r`-related states ends `r'`-related; nondeterminism is universally
-quantified, divergence claims nothing).
-
-* `rhl_iff_quad` — the exact bridge: RHL **is** the `atomW`-to-`atomW`
-  quadruple. No side conditions, loops included: `atomW` is divergence-closed,
-  which is precisely what RHL's partial reading requires. (`atom` would build
-  in a joint-termination claim RHL does not make — that upgrade is
-  `rhl_iff_quad_atom`, for the loop-free fragment.)
-* `rhl_singleton_iff` — the pointwise reformulation over singleton
-  preconditions.
-* Benton's core rules (`Skip`, `Assign`, `Seq`, `Conseq`, synchronized `If`,
-  synchronized partial `While`) all derive — `Seq` and `Conseq` directly
-  through the bridge from the relational rules.
--/
+/-! # Relational Hoare Logic is the weak-atom fragment of RelOL -/
 
 namespace RelOL
 
-/-- Benton-style relational Hoare judgment: ∀∀ over terminating runs, partial
-correctness. -/
+/-- Benton-style relational Hoare judgment. -/
 def rhl (r : State → State → Prop) (c c' : Cmd) (r' : State → State → Prop) : Prop :=
   ∀ s s', r s s' → ∀ t ∈ sem c s, ∀ t' ∈ sem c' s', r' t t'
 
-/-- **RHL subsumption**: the relational Hoare judgment is exactly the RelOL
-quadruple between weak atoms. -/
+/-- RHL subsumption. -/
 theorem rhl_iff_quad {r r' : State → State → Prop} {c c' : Cmd} :
     rhl r c c' r' ↔ ⦃atomW r⦄ c ~ c' ⦃atomW r'⦄ := by
   constructor
@@ -54,9 +34,7 @@ theorem rhl_singleton_iff {r r' : State → State → Prop} {c c' : Cmd} :
     rw [semLift_singleton, semLift_singleton] at hq
     exact hq t ht t' ht'
 
-/-- Loop-free upgrade: for terminating programs the weak atom strengthens to
-the reachability-bearing `atom`, i.e. RHL-partial and the exhaustive RelOL
-reading coincide. -/
+/-- Loop-free upgrade. -/
 theorem rhl_iff_quad_atom {r r' : State → State → Prop} {c c' : Cmd}
     (hc : LoopFree c) (hc' : LoopFree c') :
     rhl r c c' r' ↔ ∀ s s', r s s' →
@@ -92,15 +70,14 @@ theorem rhl_assign {r' : State → State → Prop} (x x' : String)
   subst ht ht'
   exact hr
 
-/-- Benton's sequencing rule: an instance of relational `Seq` through the
-bridge, with the weak-atom midcondition. -/
+/-- Benton's sequencing rule. -/
 theorem rhl_seq {r rm r' : State → State → Prop} {c₁ c₂ c₁' c₂' : Cmd}
     (h₁ : rhl r c₁ c₁' rm) (h₂ : rhl rm c₂ c₂' r') :
     rhl r (.seq c₁ c₂) (.seq c₁' c₂') r' := by
   rw [rhl_iff_quad] at h₁ h₂ ⊢
   exact quad_seq h₁ h₂
 
-/-- Benton's synchronized conditional: pointwise guard agreement. -/
+/-- Benton's synchronized conditional. -/
 theorem rhl_ite {r r' : State → State → Prop} {b b' : State → Prop}
     {c₁ c₂ c₁' c₂' : Cmd}
     (hguard : ∀ s s', r s s' → (b s ↔ b' s'))
@@ -118,10 +95,7 @@ theorem rhl_ite {r r' : State → State → Prop} {b b' : State → Prop}
     rw [sem_ite_neg hb'] at ht'
     exact h₂ s s' ⟨hr, hb, hb'⟩ t ht t' ht'
 
-/-- Benton's synchronized `While`, partial-correctness reading: a relational
-invariant with pointwise-agreeing guards. No termination premise — divergent
-runs contribute no outcomes, which the ∀∀ reading (equivalently, the weak
-atom) absorbs. -/
+/-- Benton's synchronized `While`, partial-correctness reading. -/
 theorem rhl_while {r : State → State → Prop} {b b' : State → Prop} {c c' : Cmd}
     (hguard : ∀ s s', r s s' → (b s ↔ b' s'))
     (hbody : rhl (fun s s' => r s s' ∧ b s ∧ b' s') c c' r) :
@@ -159,5 +133,65 @@ theorem rhl_while {r : State → State → Prop} {b b' : State → Prop} {c c' :
   obtain ⟨n, ht⟩ := Set.mem_iUnion.mp ht
   obtain ⟨n', ht'⟩ := Set.mem_iUnion.mp ht'
   exact aux n n' s s' hr t ht t' ht'
+
+/-- Asynchronous While (the rDo shape): left-only, right-only and joint steps under the
+schedulers `L`, `Rt`; no termination premise. -/
+theorem rhl_while_async {r : State → State → Prop} {b b' : State → Prop} {c c' : Cmd}
+    (L Rt : State → State → Prop)
+    (hside : ∀ s s', r s s' → (b s ↔ b' s') ∨ (L s s' ∧ b s) ∨ (Rt s s' ∧ b' s'))
+    (hL : rhl (fun s s' => r s s' ∧ b s ∧ L s s') c .skip r)
+    (hR : rhl (fun s s' => r s s' ∧ b' s' ∧ Rt s s') .skip c' r)
+    (hJ : rhl (fun s s' => r s s' ∧ b s ∧ b' s' ∧ ¬ L s s' ∧ ¬ Rt s s') c c' r) :
+    rhl r (.while b c) (.while b' c') (fun t t' => r t t' ∧ ¬ b t ∧ ¬ b' t') := by
+  have aux : ∀ N, ∀ n n', n + n' ≤ N → ∀ (s s' : State), r s s' →
+      ∀ t ∈ loopIter b (sem c) n s, ∀ t' ∈ loopIter b' (sem c') n' s',
+        r t t' ∧ ¬ b t ∧ ¬ b' t' := by
+    intro N
+    induction N with
+    | zero =>
+      intro n n' hN s s' _ t ht
+      obtain rfl : n = 0 := by omega
+      simp at ht
+    | succ N ih =>
+      intro n n' hN s s' hr t ht t' ht'
+      cases n with
+      | zero => simp at ht
+      | succ n =>
+      cases n' with
+      | zero => simp at ht'
+      | succ n' =>
+      by_cases hLs : b s ∧ L s s'
+      · rw [loopIter_succ_pos hLs.1] at ht
+        obtain ⟨u, hu, ht⟩ := mem_kleisli.mp ht
+        exact ih n (n' + 1) (by omega) u s'
+          (hL s s' ⟨hr, hLs.1, hLs.2⟩ u hu s' (by simp)) t ht t' ht'
+      by_cases hRs : b' s' ∧ Rt s s'
+      · rw [loopIter_succ_pos hRs.1] at ht'
+        obtain ⟨v, hv, ht'⟩ := mem_kleisli.mp ht'
+        exact ih (n + 1) n' (by omega) s v
+          (hR s s' ⟨hr, hRs.1, hRs.2⟩ s (by simp) v hv) t ht t' ht'
+      · have hiff : b s ↔ b' s' := by
+          rcases hside s s' hr with h | ⟨h1, h2⟩ | ⟨h1, h2⟩
+          · exact h
+          · exact absurd ⟨h2, h1⟩ hLs
+          · exact absurd ⟨h2, h1⟩ hRs
+        by_cases hb : b s
+        · have hb' : b' s' := hiff.mp hb
+          rw [loopIter_succ_pos hb] at ht
+          rw [loopIter_succ_pos hb'] at ht'
+          obtain ⟨u, hu, ht⟩ := mem_kleisli.mp ht
+          obtain ⟨v, hv, ht'⟩ := mem_kleisli.mp ht'
+          exact ih n n' (by omega) u v
+            (hJ s s' ⟨hr, hb, hb', fun h => hLs ⟨hb, h⟩, fun h => hRs ⟨hb', h⟩⟩ u hu v hv)
+            t ht t' ht'
+        · have hb' : ¬ b' s' := fun h => hb (hiff.mpr h)
+          rw [loopIter_succ_neg hb, Set.mem_singleton_iff] at ht
+          rw [loopIter_succ_neg hb', Set.mem_singleton_iff] at ht'
+          subst ht ht'
+          exact ⟨hr, hb, hb'⟩
+  intro s s' hr t ht t' ht'
+  obtain ⟨n, ht⟩ := Set.mem_iUnion.mp ht
+  obtain ⟨n', ht'⟩ := Set.mem_iUnion.mp ht'
+  exact aux (n + n') n n' le_rfl s s' hr t ht t' ht'
 
 end RelOL

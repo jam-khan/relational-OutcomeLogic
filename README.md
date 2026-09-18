@@ -1,17 +1,25 @@
 # Relational Outcome Logic
 
-Redo-from-scratch of the mechanization. Reference implementation lives on the
-`prototype` branch. Method: state the theorem → write the informal proof in
-the draft notes → formalize → compare with `prototype` only when stuck.
+A Lean 4 mechanization of Relational Outcome Logic: quadruples `⦃R⦄ c ~ c' ⦃S⦄` over pairs of
+outcome sets, for two programs that may live in different languages.
 
-## Redo checklist
+```
+./scripts/check.sh    # build, no sorry, standard axioms only
+```
 
-- [ ] 1. Kleisli engine (`Kleisli.lean`): `kleisli` + union/empty/comp laws; `loopIter`, `loopSem`, `loopSem_unfold`, `loopSem_eq_lfp`
-- [ ] 2. Languages (`Lang.lean`, `Hetero/Lang.lean`): `sem`/`semLift` + computation kit; `LoopFree`; `semLift_ite/while` lemmas; `errK`, `errK_assoc`, `errLoopSem`
-- [ ] 3. Assertions (`Assertions.lean`): `atom`, `atomW`, `oplus` (+ drop, left_top, true_positives, top_mono); swap kit
-- [ ] 4. Quadruples + rules (`Quadruple.lean`, `Rules.lean`): `quadSem`/`quad`; structural rules; Asgn/If; While unroll + fuel + ranked invariant; derive Choice-R yourself
-- [ ] 5. Metatheory (`Metatheory.lean`): falsification, denial, n=1 enumeration, bad-pair unsoundness, rectangle-cover incompleteness
-- [ ] 6. Subsumption (`Subsumption/OL.lean`, `Subsumption/RHL.lean`): `triple_iff_quadSem` + `embedU_oplus`; `rhl_iff_quad` + Benton rules incl. partial While
-- [ ] 7. Hetero axioms (`Hetero/Lang.lean`): `quadH` + skip/assign/addAssign ok/panic axioms
-- [ ] 8. Case studies (`Examples/`, `Compiler/`): NI + loop NI (fuel rule); GNI; translation bug + loop version; lowering, miscompilation certificates, `lower_sim`/`lower_correct`
-- [ ] Gate each step: `./scripts/check.sh` + `#print axioms` (only `propext`, `Classical.choice`, `Quot.sound`)
+| File | Content |
+| --- | --- |
+| `Kleisli.lean` | Kleisli extension over the powerset monad; Kleene iteration for loops |
+| `Lang.lean` | the while-language, its semantics, program notation |
+| `Assertions.lean` | `atom`, `atomW`, `⊕`, infinitary `⊕`, entailment |
+| `Coupling.lean` | `couple`, `coupleL`, `coupleNE`; the `⊕`-collapse; lifting through bind and loops |
+| `Quadruple.lean` | `quadSem`, `quad`, assertion notation |
+| `Rules.lean` | the proof rules: structural, product tier, While-Fam, coupling tier |
+| `Metatheory.lean` | falsification, denial, failure modes, strongest posts, Seq (in)completeness |
+| `BugCert.lean`, `Tactic/Symexec.lean` | certificate objects; the `symexec` tactic |
+| `Unary/`, `Subsumption/` | unary OL and RHL as fragments |
+| `Hetero/` | a C-like and a Rust-like language under one judgment; refinement |
+| `Compiler/` | a verified exceptions-to-error-codes pass |
+| `Examples/` | NI, GNI, coupling NI, translation bugs, miscompilation certificates |
+
+Branches `prototype` and `prototype-2` are frozen references.
