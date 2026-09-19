@@ -1,9 +1,11 @@
 # Weighted semantics contract
 
-Status: steps 1–4 of the roadmap, 2026-09-19. The existing Set logic remains the
-reference implementation. Weighted assertions, exact-marginal couplings, and quantitative
-refutation certificates build on the concrete weighted algebra. Probabilistic commands
-and a pRHL embedding remain subsequent work.
+Status: steps 1–7 of the roadmap, 2026-09-19. The existing Set logic remains the
+reference implementation. The weighted development now includes assertions, exact
+couplings, quantitative refutation, and a probabilistic while-language with synchronous
+loop soundness. The pRHL embedding adds core and one-sided rules, with explicit
+whole-loop losslessness for loop-versus-skip reasoning. Guarded unrolling and ranked
+mixed asynchronous rules now preserve the complete terminating semantics.
 
 ## Baseline
 
@@ -32,9 +34,9 @@ order are inherited pointwise. The raw carrier is a complete lattice.
 - `Weight.IsProbability μ` means `mass μ = 1`.
 
 Addition is total in the raw carrier. The probability mass bound is a separate
-predicate, to be preserved by the future probabilistic language. Unrestricted
+predicate, proved invariant under the probabilistic language. Unrestricted
 nondeterministic addition must not be silently interpreted as normalized probability
-choice. Probabilistic choice will use nonnegative coefficients whose sum is one.
+choice. Randomized choices are expressed through sampling kernels with mass one.
 
 The weighted API proves algebraic pure/bind laws directly; it does not install a new
 global `Monad` instance on the function-type abbreviation.
@@ -42,8 +44,8 @@ global `Monad` instance on the function-type abbreviation.
 ## Exact couplings and nontermination
 
 For a subprobabilistic program, mass is termination probability; missing mass records
-nontermination. Zero denotes no terminating outcomes. A sampling primitive will use
-a normalized distribution; loops may produce a subdistribution.
+nontermination. Zero denotes no terminating outcomes. Every sampling primitive carries
+a proof of normalization; loops may produce a subdistribution.
 
 The implemented relational lifting `Prob.Coupled R μ ν` uses an actual joint weight `J`:
 
@@ -60,7 +62,7 @@ termination mass one on the other side. Asynchronous one-sided phases need mass-
 obligations. Divergence-insensitive/star liftings are different semantics and must
 not be substituted under the same name.
 
-This fixes the contract for the future pRHL bridge; that bridge is not yet implemented.
+This is the contract used by the implemented pRHL bridge.
 Matching supports alone is insufficient: distributions can share their support while
 assigning different weights. The checked fair/biased coin example has identical supports
 and unit total mass, but no equality coupling. Exact equality coupling is equivalent to
@@ -127,15 +129,15 @@ requires proof that these initial weights satisfy `P`; it then refutes the judgm
 with coupling postcondition `R`. Stronger postconditions can be refuted by entailment.
 The sampling example instantiates this judgment with bind and the fair/biased kernels.
 
-These are sound certificates, checked by Lean. This stage supplies neither a search
-procedure nor a completeness theorem for all failed couplings. It needs no Strassen
-theorem, probabilistic command syntax, or loop soundness theorem.
+These are sound certificates, checked by Lean. Certificate discovery and completeness
+for all failed couplings remain separate obligations. The certificate proofs need no
+Strassen theorem and are independent of the probabilistic syntax and loop rules.
 
 ## Increasing limits and algebraic boundaries
 
 The mass and bind continuity theorems require increasing sequences. Bind is continuous
 in either argument; if both input weights and continuations increase, it preserves
-their common-index limit. These facts support future Kleene loop semantics.
+their common-index limit. These facts support the implemented Kleene loop semantics.
 
 The checked counterexamples show:
 
@@ -150,10 +152,110 @@ subprobability continuations. They are not treated as a pointwise complete latti
 ENNReal's convention `0 * ∞ = 0` is retained. Cancellation, division, and normalization
 require separate hypotheses and are outside this stage.
 
-For the planned increasing-limit proof of loop couplings, a coupling for each marginal
-approximation is not enough: construct a coherent increasing family of joint witnesses
-before applying increasing-limit results. Other limit constructions would require
-their own justification.
+The synchronous loop proof constructs a coherent increasing family of joint witnesses.
+A coupling chosen independently for each marginal approximation would not establish
+that hypothesis. `IsCoupling.iSup` explicitly requires monotonicity of the joint chain
+and proves preservation of both exact marginals and the support relation.
+
+## Probabilistic commands and synchronous loops
+
+`Prob.Cmd α` supplies skip, deterministic state updates, normalized sampling,
+sequencing, conditionals, and while over a generic state type. The two sides of a
+judgment may use different state types. There is no unrestricted additive branching
+command; sampling accepts a kernel only with a proof that every input produces total
+mass one.
+
+`sem` maps a starting state to its terminating output weights. `semLift` executes a
+command from a weighted input using bind. Every command preserves the subprobability
+bound, and its lifted semantics cannot increase total mass. Loop-free commands preserve
+all input mass. Addition and scaling remain laws of the lifted raw-weight semantics.
+
+A loop starts with a zero approximation. The next approximation returns a unit weight
+when the guard is false, or executes the body followed by the previous approximation
+when the guard is true. These approximations increase; their supremum equals the
+least fixed point of the loop functional. Increasing-limit continuity proves unfolding
+and subprobability preservation. Terminating outcomes satisfy the negated guard;
+a guard that is always true produces zero terminating weight.
+
+The synchronous rule requires the guards to agree at related states and the body to
+preserve the relation on guarded inputs. The proof selects one body-joint kernel,
+then executes its product loop. Each product approximation has exactly the two
+separate program approximations as marginals. Its increasing limit yields the loop
+coupling, with the invariant and both exit conditions. Neither losslessness nor a
+finite iteration bound is assumed.
+
+`Prob.Rules` lifts these facts into weighted judgments: consequence, skip, sequencing,
+additive splitting, common scaling, assignment, sampling, synchronized conditionals,
+and synchronous while.
+
+The coin-retry example repeatedly samples a fair coin until its stopping value occurs.
+It proves almost-sure termination and that every finite approximation has mass strictly
+less than one. Two loops with opposite Boolean encodings are related using the sampling
+and while rules. Additional examples prove a joint-divergence specification and reject
+comparing divergence with terminating skip.
+
+## pRHL embedding and one-sided rules
+
+`Prob.prhl R c d S` requires an exact `S`-coupling of the output subdistributions
+from every pair of starting states satisfying `R`. `prhl_iff_quad` proves:
+
+```text
+prhl R c d S ↔ quad (couple R) c d (couple S)
+```
+
+The generic `prhlSem_iff_quadSem` proves the corresponding result for arbitrary
+discrete kernels, independently of command syntax. Its forward direction sequences
+the input coupling with pointwise output couplings; its reverse direction specializes
+to point masses. Both directions cover raw input weights without normalization.
+
+The core pRHL rules are obtained through the weighted rules. One-sided assignment,
+sampling, conditionals, loops, and symmetry are also exposed. `LosslessOn P c` requires
+total output mass one at every starting state in `P`. For a loop against skip, the
+whole loop must be lossless on the appropriate projection of the relational invariant.
+The body must preserve the relation against skip at guarded states. The proof first
+establishes invariant and exit support, then combines that support property with
+whole-loop losslessness to obtain an exact coupling against the unchanged point mass.
+
+Checked examples derive an unbounded synchronous retry coupling through the new rules,
+and derive retry versus skip in both directions over different state types. A divergent
+loop with a lossless body refutes even the universally true postrelation against skip,
+demonstrating why the whole-loop condition cannot be dropped. `MassDeficitCert.refutes_prhl`
+and `BugCert.refutes_prhl` transport quantitative refutation; the fair/biased example
+uses the existing finite-event certificate to reject an actual pRHL sample specification.
+
+This is a semantic equivalence with named admissible rules for the current language.
+An inductive derivation translation, external procedure/module interfaces, and
+semiring abstraction remain separate work. See the
+[rule inventory and scope](prhl-subsumption.md).
+
+## Guarded unrolling and ranked mixed scheduling
+
+Guarded two-iteration unrolling preserves full raw-weight loop semantics. Its positive
+approximations equal the original approximations at the cofinal indices `2 * n + 1`.
+No losslessness premise is needed. The Boolean-OR accumulator client has a separate
+mass-one proof and a certified faulty variant whose observed false probability changes
+from one half to one quarter while its observed support stays the same.
+
+`Prob.AsyncSchedule` selects left-only, right-only, joint, or done modes. Local body
+couplings preserve the invariant; unilateral couplings also decrease a natural rank
+and have the passive point mass as an exact marginal. The latter forces mass one for
+the advancing body. Done requires both guards false. Joint steps may reset the rank
+and may lose mass through matched divergence; no uniform rank bound or global loop
+termination is required.
+
+The implementation fixes one joint body kernel. `pushforward_loopSem` proves the
+complete projection equality by two inequalities: finite joint approximants project
+below the original limit, and finite original approximants lie below the projected
+joint limit. The reverse direction inducts on original fuel and on rank for passive
+steps. `AsyncSchedule.isCoupling_loop` then establishes both exact terminal marginals
+and the invariant with exit conditions. These equations are conclusions, not schedule
+premises. The corresponding Set theorem proves exact outcome-set images and bitotal
+coupling, extending the existing weak-atom partial-correctness rule.
+
+The rank requirement covers finite unilateral catch-up between joint steps. It does
+not cover arbitrary almost-surely terminating unilateral phases with self-loops; those
+need a further phase theorem. Random draws in the current clients are aligned jointly.
+See [loop alignment](loop-alignment.md) for the theorem inventory and examples.
 
 ## Validation
 
@@ -162,7 +264,7 @@ checks their proofs and includes all their declarations in the existing axiom ga
 The gate permits only `propext`, `Classical.choice`, and `Quot.sound` transitively.
 The Set development must continue to pass without changing its semantics or examples.
 
-The integrated step 4 check passed on 2026-09-19: 1,552 build jobs and 1,556 library declarations,
+The integrated step 7 check passed on 2026-09-19: 1,570 build jobs and 2,143 library declarations,
 all using only the permitted standard axioms.
 
 The next milestones and their acceptance criteria are maintained in

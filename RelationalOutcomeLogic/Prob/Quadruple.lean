@@ -4,8 +4,8 @@ import RelationalOutcomeLogic.Prob.Assertions
 # Semantic judgments over weighted outcomes
 
 This language-independent judgment lets a quantitative certificate refute a
-specification of two weight transformers. A probabilistic command language and its
-mass-preservation proofs are separate developments.
+specification of two weight transformers. `Prob.Lang` instantiates it with a
+probabilistic command language and proves preservation of subprobability bounds.
 -/
 
 namespace RelOL.Prob
