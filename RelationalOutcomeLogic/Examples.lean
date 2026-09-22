@@ -17,6 +17,7 @@ import RelationalOutcomeLogic.Examples.Probability.Search.Case
 import RelationalOutcomeLogic.Examples.Probability.Search.Cost
 import RelationalOutcomeLogic.Examples.Probability.Search.OutcomeContract
 import RelationalOutcomeLogic.Examples.Probability.Search.Programs
+import RelationalOutcomeLogic.Examples.Probability.SpeculativeDecoding.Case
 import RelationalOutcomeLogic.Examples.Set.AsynchronousCountdown
 import RelationalOutcomeLogic.Examples.Set.Noninterference.Basic
 import RelationalOutcomeLogic.Examples.Set.Noninterference.Coupling

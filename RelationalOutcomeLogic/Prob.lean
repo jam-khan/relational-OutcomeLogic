@@ -6,6 +6,7 @@ import RelationalOutcomeLogic.Prob.Coupling.Restriction
 import RelationalOutcomeLogic.Prob.Coupling.Support
 import RelationalOutcomeLogic.Prob.Coupling.SynchronousLoop
 import RelationalOutcomeLogic.Prob.Logic.Assertions
+import RelationalOutcomeLogic.Prob.Logic.FiniteOutcomes
 import RelationalOutcomeLogic.Prob.Logic.Judgment
 import RelationalOutcomeLogic.Prob.Logic.OneSided
 import RelationalOutcomeLogic.Prob.Logic.Rules

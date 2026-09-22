@@ -17,13 +17,13 @@ RelationalOutcomeLogic/
 │   ├── Outcome/       Basic, Iteration: outcome interfaces
 │   ├── Scalar/        Basic, Order: scalar and summation laws
 │   ├── Weighted/      Basic, Outcome, Iteration, Coupling, Observation, Events
-│   ├── ENNReal/       Basic, Limits: concrete nonnegative weights
+│   ├── ENNReal/       Basic, Limits, Sequencing, Expectation
 │   ├── Instances/     Boolean, Probability, Counting, Tropical, Language
 │   └── Alignment.lean
 ├── Generic/
 │   ├── Assertions.lean, Judgment.lean, Rules.lean
-│   ├── Coupling.lean, Refutation.lean
-│   └── Loops/         Semantics, Support, Synchronous, Asynchronous
+│   ├── Coupling.lean, Distributional.lean, Refutation.lean
+│   └── Loops/         Semantics, Support, Bounded, Synchronous, Asynchronous
 ├── Set/
 │   ├── State.lean, Semantics.lean, Language.lean, Exceptions.lean
 │   ├── Assertions.lean, Coupling.lean, Judgment.lean, Rules.lean
@@ -33,7 +33,7 @@ RelationalOutcomeLogic/
 │   ├── Semantics/     Commands, Loop
 │   ├── Coupling/      Basic, Assertions, Observation, Restriction, Support,
 │   │                  SynchronousLoop, AsynchronousLoop
-│   ├── Logic/         Assertions, Judgment, Rules, OneSided
+│   ├── Logic/         Assertions, Judgment, Rules, OneSided, FiniteOutcomes
 │   ├── Refutation/    EventMass, Certificate, Observation
 │   └── Transformations/ GuardedUnroll
 ├── Subsumption/
@@ -45,8 +45,12 @@ RelationalOutcomeLogic/
 │   ├── Set/           Noninterference/, AsynchronousCountdown
 │   ├── Probability/   Coins, MassDeficit, GeometricRetry, RetryCoupling,
 │   │                  GuardedUnrolling, AsynchronousLoops, AlgebraBoundaries
-│   │   └── Search/    Programs, Alignment, OutcomeContract, Cost,
+│   │   ├── Search/    Programs, Alignment, OutcomeContract, Cost,
 │   │                  CachedRandomness, Case
+│   │   └── SpeculativeDecoding/  Programs, Correction, StepContract, Refinement,
+│   │                  DecoderRules, Buffered, Fuel, Costs, OutcomeContracts, RoundLaw,
+│   │                  RoundExpectation, RoundClipping, Counterexamples,
+│   │                  Security, Implementation, Case
 │   ├── Algebra/       Routes, Countdown, AsynchronousCountdown, Traces
 │   ├── Subsumption/   Allocation, ProbabilisticHoare
 │   ├── Translation/   Languages, Refinement, Overflow, Loops
@@ -67,6 +71,36 @@ Concrete Set and probabilistic semantics and rules live in their own directories
 `Subsumption/` gives the embedded logics, while `Bridges/` proves agreement between
 the generic and concrete developments. Examples sit above the library layers.
 No library module imports an example.
+
+The [speculative-decoding case](speculative-decoding.md) is self-contained under
+`Examples/Probability/SpeculativeDecoding/`. Its reusable additions have explicit
+library boundaries:
+
+| Module | Reusable interface |
+| --- | --- |
+| `Algebra/ENNReal/Sequencing.lean`, `Expectation.lean` | Independent sampling, normalized discard, and nonnegative expected costs |
+| `Generic/Distributional.lean` | Conditional reconstruction invariants and local refinement rules, including dispatch |
+| `Generic/Loops/Bounded.lean` | Bounded sequencing and recursion rules, with indexed families of continuation contracts |
+| `Prob/Logic/FiniteOutcomes.lean` | Finite additive outcome cases, their masses, and composition through additive transformers |
+
+`Correction.lean` proves the local accept/correct sampling identities.
+`StepContract.lean` derives their quantitative outcome contract using sequencing
+and additive choice. The decoder consumes its token-observation consequence.
+`Refinement.lean` uses a conditional reconstruction invariant and the shared
+sequencing, dispatch, and recursion rules to verify the eager random buffer.
+`DecoderRules.lean` derives the complete decoder contract from local sampler and
+continuation contracts. `Buffered.lean` exposes normalization, length, and output
+corollaries; `Fuel.lean` proves equality of complete run distributions for any two
+sufficient fuel bounds. The executable kernels remain in `Programs.lean`.
+
+`RoundLaw.lean` retains each first-rejection outcome and its history-dependent
+survival mass. `RoundExpectation.lean` derives expected counts, and
+`RoundClipping.lean` handles finite remaining budgets, including zero budget and
+suppressed bonus tokens. `Security.lean` proves a generic acceptance-gap privacy
+refutation and instantiates it with the Boolean example. These results reuse the
+existing judgment and additive semantics; the new rules are derived from their
+laws. Algorithmic novelty and external implementation correspondence are separate
+claims whose scope is recorded in the detailed case guide.
 
 Inside the probabilistic development, observation and coupling operations are
 separate from judgments and certificates. `Prob/Coupling/AsynchronousLoop.lean`

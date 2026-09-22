@@ -1,6 +1,8 @@
 import RelationalOutcomeLogic.Algebra.Alignment
 import RelationalOutcomeLogic.Algebra.ENNReal.Basic
+import RelationalOutcomeLogic.Algebra.ENNReal.Expectation
 import RelationalOutcomeLogic.Algebra.ENNReal.Limits
+import RelationalOutcomeLogic.Algebra.ENNReal.Sequencing
 import RelationalOutcomeLogic.Algebra.Instances.Boolean
 import RelationalOutcomeLogic.Algebra.Instances.Counting
 import RelationalOutcomeLogic.Algebra.Instances.Language
