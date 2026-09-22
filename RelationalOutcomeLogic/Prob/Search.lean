@@ -1,4 +1,5 @@
 import RelationalOutcomeLogic.Prob.Lang
+import RelationalOutcomeLogic.Prob.Observation
 import Mathlib.Tactic.NormNum
 
 /-!
@@ -47,7 +48,7 @@ def seed (n : ℕ) : Weight State := Weight.pure (n, false)
 
 /-- The externally visible result forgets how many trials remain. -/
 def observe (μ : Weight State) : Weight Bool :=
-  Weight.bind μ (fun s => Weight.pure s.2)
+  pushforward Prod.snd μ
 
 def observed (c : Cmd State) (μ : Weight State) : Weight Bool := observe (semLift c μ)
 

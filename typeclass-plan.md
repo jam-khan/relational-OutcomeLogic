@@ -1,8 +1,13 @@
 # RelOL implementation roadmap
 
-Updated 2026-09-19 after implementing guarded block unrolling and ranked mixed
-asynchronous coupling for Set and probabilistic outcomes. This replaces the earlier abstraction-first
-proposal. The Set coupling tier, compiler, heterogeneous examples, certificates,
+Updated 2026-09-21 after shared algebra and semiring generalization: common structural
+proofs, constructed scalar-weight semantics, generic exact couplings and certificates,
+synchronous/ranked asynchronous loops, and five concrete scalar instances. The earlier
+randomized-search case includes asynchronous early-exit correctness, quantitative
+splitting, trial savings, and refutation of the same internal contract. The case was
+completed before algebra extraction; the original milestone numbers and historical
+validation records are retained below. The Set coupling tier,
+compiler, heterogeneous examples, certificates,
 symbolic execution, and axiom gate already exist; they are prerequisites, not work
 to repeat.
 
@@ -10,13 +15,19 @@ to repeat.
 
 - Preserve the existing Set development as the regression reference.
 - Keep Lean/Mathlib v4.32.1; no additional dependency is needed for this foundation.
-- Use raw `Weight α := α → ℝ≥0∞`, with total addition and pointwise order.
+- Preserve raw `Weight α := α → ℝ≥0∞` as the concrete probability carrier. The
+  constructed generalization is `Algebra.Weighted.Weight K α := α → K`.
 - Enforce normalized sampling and prove that every probabilistic command preserves
   the subprobability bound.
 - Use joint weights with exact marginals for the first probabilistic lifting.
   Both sides may diverge, but their termination masses must agree.
-- Prove concrete weighted results before extracting a generic outcome-model interface.
+- The completed generic interface and scalar factory are grounded in the preceding
+  concrete weighted proofs and algorithmic case.
 - Restrict limit-preservation laws to increasing families.
+- Keep normalization, exact support laws, scalar summation, and increasing-limit
+  assumptions separate. Do not assume infinite sums from a bare semiring.
+- Completeness results are outside the current plan, as requested. Explicit derivation
+  datatypes and proof-tree translation are optional; semantic rules remain the working API.
 
 See the [semantic contract](docs/weighted-semantics.md) and the supporting
 [infrastructure audit](notes/infrastructure-audit.md).
@@ -121,8 +132,8 @@ missing possible outcome.
 All four modules are root-imported. The integrated check passed: 1,552 build jobs,
 1,556 library declarations, no proof placeholders, and standard axioms only.
 
-This proves soundness without Strassen. Certificate discovery and completeness remain
-separate extensions. Probabilistic syntax, mass-preserving command semantics, and loop
+This proves soundness without Strassen. Certificate discovery is separate work;
+certificate completeness is not a current target. Probabilistic syntax, mass-preserving command semantics, and loop
 rules are not supplied by this milestone.
 
 ## 5. Probabilistic commands and synchronous loops — complete
@@ -183,7 +194,7 @@ whole-loop losslessness is necessary for one-sided exact coupling.
 
 This is semantic equivalence and named admissible rules for the current command
 language. The examples compose these rules in Lean; an inductive derivation datatype
-and proof-tree translation remain step 9. External procedure/module/oracle semantics
+and proof-tree translation are optional extensions. External procedure/module/oracle semantics
 and EasyCrypt integration are not claimed. The exact rule inventory is recorded in
 [`docs/prhl-subsumption.md`](docs/prhl-subsumption.md).
 
@@ -235,8 +246,8 @@ Unilateral exact couplings against a passive point mass force body losslessness.
 Joint divergence is allowed; whole-program termination is not a theorem premise.
 
 This completes **ranked mixed scheduling**. Almost-surely terminating phases with
-unbounded stochastic stuttering, unrestricted fair schedulers, and alignment
-completeness remain extensions. The standalone lossless one-sided loop rule already
+unbounded stochastic stuttering and unrestricted fair schedulers remain extensions.
+Alignment completeness is outside the plan. The standalone lossless one-sided loop rule already
 supports geometric retry against skip, but that fact alone does not extend the ranked
 mixed theorem. See [`docs/loop-alignment.md`](docs/loop-alignment.md) for the scope.
 
@@ -245,50 +256,118 @@ All eight new modules are root-imported. The integrated step 7 check passed:
 axioms only. Independent source reviews found no mathematical issue in the unrolling,
 certificate, Set projection, or probabilistic projection proofs.
 
-## 8. Shared algebra and semiring parametricity
+## 8. Shared algebra and semiring parametricity — complete
 
-1. Extract a small outcome-model interface from the concrete proofs used by the
-   alignment clients. Share structural assertion laws, sequencing, and coupling
-   construction; keep normalization as a separate predicate.
-2. Separate assumptions for idempotence, scaling, support, and increasing limits.
-   Instantiate the interface with Set and ENNReal, and retain compatibility lemmas
-   so existing examples and the compiler continue to build.
-3. Build the admissible weight-algebra factory separately. State the support laws
-   requiring positivity/no cancellation and no zero divisors, and the summation and
-   continuity laws required for infinite discrete sequencing and loops. Instantiate
-   with Boolean/set weights and ENNReal and identify exactly which theorems are shared.
+- `Algebra/OutcomeModel.lean`, `Generic/Assertions.lean`, and `Generic/Rules.lean`
+  provide additive outcome semantics and shared structural assertion, sequencing,
+  choice, and splitting proofs. `Generic/Concrete.lean` instantiates them with the
+  existing Set and ENNReal APIs without replacing those APIs.
+- `Algebra/Scalar.lean` states the additional arbitrary-summation laws explicitly.
+  `Algebra/Weighted.lean`, `WeightedModel.lean`, and `WeightedCoupling.lean` construct
+  weights, pure/bind, addition, scaling, mass, exact marginals, and supported coupling
+  composition. The construction permits noncommutative multiplication. Positivity
+  and no zero divisors are separate requirements for exact support equivalences;
+  the coupling construction itself needs neither.
+- `Algebra/OrderedScalar.lean`, `IterationModel.lean`, and `WeightedOrder.lean`
+  state and lift order/increasing-limit assumptions. `Generic/Iteration.lean` proves
+  unfolding and least-fixed-point iteration once for the shared model.
+- `Generic/WeightedLogic.lean` proves the generic statewise coupling/outcome-judgment
+  equivalence. `Generic/LoopCoupling.lean` constructs coherent synchronous joint
+  executions. `Generic/AsyncLoop.lean` proves exact full-loop marginals for ranked
+  mixed schedules, with local one-step obligations and strict unilateral rank descent.
+  Final marginal equality is a conclusion, not a scheduler premise.
+- `Generic/WeightedCertificates.lean` derives finite-event coupling bounds from
+  the scalar laws and proves generic `MassDeficitCert` and actual-input `BugCert`
+  soundness. Scalar order determines the comparison; tropical order reverses
+  numerical cost. No subtraction, normalization, or extra event-bound axiom is used.
+- `Algebra/Instances/` contains five checked instances: Boolean reachability,
+  ENNReal weights, extended-natural trace counts, tropical minimum costs, and
+  noncommutative languages of finite traces. Their summations agree with canonical
+  finite-subsum suprema. `Generic/InstanceExamples.lean` instantiates common route and
+  countdown proofs and certifies count/cost errors invisible to reachability.
+  `Generic/TraceExamples.lean` checks ordered logging and its faulty swap.
+  `Generic/AsyncExamples.lean` runs one mixed schedule with joint weighted steps and
+  unilateral bookkeeping in multiple scalar models.
+- `Generic/Compatibility.lean` proves agreement with old Set/ENNReal full loops and
+  ENNReal coupling and pRHL definitions. `Generic/BooleanBridge.lean` preserves
+  union, sequencing, and full loops under Boolean encoding and proves equivalence
+  between Boolean exact marginals and existing bitotal Set matching.
 
-Shared interfaces alone are not semiring parametricity. A bare `Semiring` does not
-provide the support or limit laws required here; the factory must expose its actual
-extra assumptions.
+See [semiring models](docs/semiring-models.md) for the operations, theorem inventory,
+clients, and TOPLAS comparison. The supported class consists of total summation
+semirings with explicit order/continuity laws for loops. It does not encode every
+partial weight algebra from TOPLAS. Finite-word languages record terminating traces;
+infinite-word observations and mixed probability/demonic choice remain outside scope.
 
-Corrections to the previous proposal:
+Acceptance met: substantial structural, coupling, certificate, synchronous-loop, and
+ranked-asynchronous proofs are shared across actual constructed models. A bare
+`Semiring` is never treated as supplying infinite sums. Normalization remains a
+separate ENNReal property, and the probability-bounded subset is not incorrectly
+declared a pointwise complete lattice. The original Set-specific proof APIs remain
+available alongside the checked compatibility maps.
 
-- Raw weights are a complete lattice; the mass-bounded subset is not closed under
-  arbitrary pointwise suprema.
-- Underapproximation and unary embedding should be inspected individually; the old
-  blanket claim that they require idempotence was too broad.
-- Probabilistic couplings require joint weights and marginal equations, not just
-  the support-membership interface used for possibilistic matching.
+The integrated generalization check passed: 1,613 build jobs, 3,088 library
+declarations, no proof placeholders, and standard axioms only. Concrete bridge
+checks also confirmed that Boolean weights select the intended factory instance
+when imported together with the existing Set/probability models.
 
-Acceptance: substantial shared proofs instantiate in both models, with every additional
-algebraic assumption stated explicitly.
+## 9. End-to-end algorithmic case — complete
 
-## 9. Explicit derivations and substantial examples
+The [randomized-search case](docs/randomized-search.md) compares a full budget of
+independent Bernoulli trials with early exit at the first hit, for every budget and
+normalized miss/hit distribution.
 
-1. Fix an explicit rule inventory, introduce derivation objects, and prove soundness
-   by induction. Reconstruct selected Set and probabilistic proofs using those rules;
-   do not make derivability trivial by adding arbitrary semantic validity as a constructor.
-2. Extend the initial alignment client into a substantial transformation with a
-   correctness derivation and a certified faulty variant. Make additive splitting,
-   sequencing, coupling, and loops contribute to the proof so the case demonstrates
-   what the outcome-assertion layer adds beyond the pRHL fragment.
-3. State any derivation-translation or relative-completeness target only for the
-   chosen language, assertion fragment, and rule inventory. Semantic pRHL equivalence
-   already holds; a separate proof-calculus translation remains a distinct theorem.
+- `Prob/Search.lean`: actual commands, exact full-scan output weights, and mass one.
+- `Prob/SearchCoupling.lean`: a mixed schedule with joint draws before success and
+  unilateral cleanup afterwards; exact output marginals, pRHL/weighted judgments,
+  observed answer equality, and a coupled non-strict trial bound.
+- `Prob/Restriction.lean`: restrict a single joint by a shared observable, preserving
+  exact restricted marginals; split the result into complementary quantified pieces.
+- `Prob/SearchOutcome.lean`: a weighted program judgment whose additive failure and
+  success pieces have exact masses `q^n` and `S(n)`, with `q^n + S(n) = 1`.
+  Failure requires both remaining budgets to be zero, including at initial budget zero.
+- `Prob/SearchCost.lean`: for budgets at least two, the probability of a nonempty
+  proper-prefix success is at least the hit probability. This is the strict-saving
+  result; the non-strict cost bound alone does not establish an improvement.
+- `Prob/SearchCertificates.lean`: a cached-draw command has failure probability `q`
+  instead of `q^n`. For `0 < q < 1` and `n > 1`, an actual command-indexed certificate
+  refutes observed equivalence even though both programs have mass one and the same
+  Boolean support. Zero/one-budget agreement is also proved.
 
-Acceptance: an explicit sound derivation system and an end-to-end correct/faulty case.
-General coupling completeness and unrestricted alignment completeness are not prerequisites.
+This completes the parameterized correct/faulty algorithmic case. It uses the existing
+semantic proof-rule API; it does not require a new derivation datatype. The example
+combines relational correctness with class-specific masses and a quantitative
+counterexample. It is not a production application or a proof of expected running time.
+
+All six modules are root-imported. The integrated check passed: 1,576 build jobs,
+2,312 library declarations, no proof placeholders, and standard axioms only.
+Independent reviews checked the joint restriction, scheduler, cost events, and
+zero-budget specification. No new dependency was needed.
+
+Optional: if an external integration needs explicit proof objects, introduce a
+derivation datatype with a fixed rule inventory and prove soundness by induction.
+Semantic pRHL equivalence already holds; proof-tree translation is a separate theorem.
+
+### Presentation and API consolidation — complete
+
+- `Prob/Observation.lean` now owns the deterministic pushforward helpers previously
+  local to asynchronous loops, preserving their names. It supplies coupling and
+  judgment transport plus `BugCert.refutes_of_observation`, independent of command syntax.
+- `resultSpec_couple` and `resultSpec_observed_eq` expose the observable consequence
+  of the quantitative postcondition. `Prob/SearchCase.lean` is the complete case's
+  public import; `cached_outcome_spec_refuted` refutes exactly the judgment proved by
+  `search_outcome_quad`, substituting cached search for early exit.
+- The [theorem guide](docs/theorem-guide.md) gives imports, checked client examples,
+  loop obligations, and the observation/refutation workflow. The reference paper
+  now includes weighted semantics, the semantic pRHL bridge, ranked asynchronous
+  rules, finite-event certificates, and the search case with a matching theorem index.
+  Existing Set-specific results remain explicitly scoped to that model.
+
+Validation passed: 1,578 build jobs, 2,321 declarations, no proof placeholders, standard
+axioms only. The guide's Lean examples compile from the public import. Independent
+review checked the observed certificate's precondition and orientation and confirmed
+that the correct and faulty variants use the same contract. This is presentation of
+the checked results, not a completed related-work or publication novelty assessment.
 
 ## 10. Automation and machine-level realism
 
@@ -312,11 +391,12 @@ sampling, observation, and divergence semantics before reusing correctness resul
 procedure/module/oracle support must be handled explicitly if present. No current
 milestone depends on access to that project.
 
-Once the main case is checked, update the paper to distinguish the semantic embedding,
-new proof rules, quantitative refutation, and the shared algebra. Revisit related work
-before making novelty claims. Finite-event certificates currently prove soundness,
-not discovery completeness or a general Strassen converse. These are separate research
-extensions, as are continuous probability and approximate couplings.
+The main algorithmic case and reference paper's theorem map are now checked. The
+presentation distinguishes the semantic embedding, asynchronous rule, quantitative
+outcome contract, refutation certificate, and the now-completed generic algebra and
+five scalar models. Revisit related work before making novelty claims. Finite-event
+certificates prove soundness; no discovery completeness or Strassen converse is a
+current objective. Continuous probability and approximate couplings remain out of scope.
 
 ## Validation and the next decision point
 
@@ -324,9 +404,18 @@ Run `./scripts/check.sh` at each milestone. Import production modules in the roo
 the axiom gate checks their declarations. Keep standard axioms only and preserve the
 existing Set examples. Put mass bounds and chain monotonicity in theorem statements.
 
-The next implementation target is step 8: extract shared algebra from the completed
-Set and ENNReal developments, then establish the promised weight-algebra parametricity
-with explicit extra assumptions. Steps 1–7 are complete. Explicit derivations and the
-larger correct/faulty case remain step 9; automation remains step 10. Full Strassen
-completeness, arbitrary-semiring coupling theory, and more general almost-sure phase
-scheduling remain separate obligations.
+Steps 1–9 and the case's presentation/API consolidation are complete. Remaining work
+is driven by the intended artifact and paper contribution:
+
+1. Add step 10's finite-support certificate discovery if automation is part of the
+   contribution, reconstructing every result through the sound certificate API.
+2. Polish the paper's examples, assumption table, and comparison with the TOPLAS model
+   family and related relational logics. The implemented theorem inventory is the
+   boundary for claims; publication novelty remains a separate research assessment.
+3. When EasyCrypt-in-Lean exposes an interface, establish semantic compatibility and
+   reuse its infrastructure through the existing kernel/pRHL bridge. This work remains
+   deferred until that interface is available.
+
+Completeness is excluded. Explicit derivation objects, expected-cost semantics,
+machine-level realism, external integration, and more general almost-sure phase
+scheduling are optional extensions driven by a concrete need.

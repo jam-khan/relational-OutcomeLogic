@@ -1,5 +1,6 @@
 import RelationalOutcomeLogic.Algebra.Alignment
 import RelationalOutcomeLogic.Prob.OneSided
+import RelationalOutcomeLogic.Prob.Observation
 
 /-!
 # Ranked asynchronous loop couplings
@@ -81,36 +82,6 @@ theorem kernel_invariant (S : AsyncSchedule R g h k l) {p : α × β}
   | done => exact (hactive hm).elim
 
 end AsyncSchedule
-
-/-- Push a discrete weight through a state projection. -/
-noncomputable def pushforward (π : σ → τ) (μ : Weight σ) : Weight τ :=
-  Weight.bind μ (fun s => Weight.pure (π s))
-
-@[simp] theorem pushforward_zero (π : σ → τ) : pushforward π 0 = 0 :=
-  Weight.zero_bind _
-
-@[simp] theorem pushforward_pure (π : σ → τ) (s : σ) :
-    pushforward π (Weight.pure s) = Weight.pure (π s) := Weight.pure_bind _ _
-
-theorem pushforward_bind (π : σ → τ) (μ : Weight σ) (K : σ → Weight σ) :
-    pushforward π (Weight.bind μ K) = Weight.bind μ (fun s => pushforward π (K s)) :=
-  Weight.bind_assoc _ _ _
-
-theorem bind_pushforward (π : σ → τ) (μ : Weight σ) (f : τ → Weight β) :
-    Weight.bind (pushforward π μ) f = Weight.bind μ (fun s => f (π s)) := by
-  simp only [pushforward, Weight.bind_assoc, Weight.pure_bind]
-
-theorem pushforward_iSup (π : σ → τ) (μ : ℕ → Weight σ) (hμ : Monotone μ) :
-    pushforward π (⨆ n, μ n) = ⨆ n, pushforward π (μ n) :=
-  Weight.bind_iSup_left μ hμ _
-
-@[simp] theorem pushforward_fst (J : Weight (α × β)) :
-    pushforward Prod.fst J = margL J := by
-  rw [pushforward, bind_fst, Weight.bind_pure]
-
-@[simp] theorem pushforward_snd (J : Weight (α × β)) :
-    pushforward Prod.snd J = margR J := by
-  rw [pushforward, bind_snd, Weight.bind_pure]
 
 /-- Pointwise comparison is needed only where the input weight is supported. -/
 theorem bind_le_bind_on_support (μ : Weight σ) {f q : σ → Weight τ}

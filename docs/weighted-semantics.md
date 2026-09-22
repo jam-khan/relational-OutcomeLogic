@@ -1,11 +1,55 @@
 # Weighted semantics contract
 
-Status: steps 1–7 of the roadmap, 2026-09-19. The existing Set logic remains the
-reference implementation. The weighted development now includes assertions, exact
+Status: steps 1–9, including shared algebra and semiring generalization, 2026-09-21.
+The existing Set logic remains the regression reference. The weighted development includes assertions, exact
 couplings, quantitative refutation, and a probabilistic while-language with synchronous
 loop soundness. The pRHL embedding adds core and one-sided rules, with explicit
 whole-loop losslessness for loop-versus-skip reasoning. Guarded unrolling and ranked
 mixed asynchronous rules now preserve the complete terminating semantics.
+The [theorem guide](theorem-guide.md) connects these APIs to the complete
+correctness/refutation case.
+
+## Shared algebra and constructed scalar models
+
+`OutcomeModel M` supplies additive outcomes and Kleisli sequencing. Shared assertion
+and judgment proofs live in `Generic/Assertions.lean` and `Generic/Rules.lean`;
+`Generic/Concrete.lean` instantiates these operations with Set union and ENNReal
+addition and proves compatibility with the existing assertion and judgment APIs.
+
+The separate scalar factory constructs `Algebra.Weighted.Weight K α := α → K`.
+`SummationSemiring K` extends the assumptions on a semiring with an explicit arbitrary
+sum and its zero, singleton, addition, product-index, Fubini, and multiplication laws.
+From these scalar laws, the development proves pure/bind, additive choice, scaling,
+mass, exact marginals, and supported coupling composition. The coupling theorems are
+proved from the construction; they are not fields assumed by an interface.
+Multiplication need not commute. Moving a left scalar through a continuation requires
+an explicit commutation premise.
+
+`OmegaSummationSemiring K` additionally records a complete order with zero as bottom,
+monotonicity, and the increasing-limit laws needed for iteration. It constructs an
+`IterationModel`, whose single loop development proves unfolding and least-fixed-point
+semantics. Generic exact-coupling rules cover synchronous and ranked mixed asynchronous
+loops. `PositiveSummation` and `NoZeroDivisors` are separate assumptions for exact
+support equivalences; coupling composition and the generic loop rules do not need them.
+
+Five actual instances are supplied: Boolean reachability, ENNReal weights, extended
+natural trace counts, tropical minimum cost, and languages of finite traces. Each has
+a proved canonical finite-subsum interpretation. Probability normalization is still
+a predicate on ENNReal weights. Tropical inequalities use reverse numerical order;
+language multiplication concatenates words and is noncommutative. See the
+[model comparison and checked clients](semiring-models.md).
+
+`Generic/Compatibility.lean` identifies the old Set/ENNReal full loops and ENNReal
+couplings and pRHL judgments with the shared definitions. `Generic/BooleanBridge.lean`
+also proves that Boolean weighted sequencing and full loops recover Set execution,
+and exact Boolean marginals recover bitotal Set coupling. Existing specialized theorem
+names and probabilistic commands remain available.
+
+Generic finite-event bounds and `MassDeficitCert`/`BugCert` now work in the chosen
+scalar order. Their proofs derive finite-event bounds from the summation laws and
+monotonicity; they need no additional finite-event axiom. The count and tropical
+clients use these certificates to reject a route deletion with unchanged possible
+destination states. The sections below retain the ENNReal-specific probability contract.
 
 ## Baseline
 
@@ -129,9 +173,26 @@ requires proof that these initial weights satisfy `P`; it then refutes the judgm
 with coupling postcondition `R`. Stronger postconditions can be refuted by entailment.
 The sampling example instantiates this judgment with bind and the fair/biased kernels.
 
-These are sound certificates, checked by Lean. Certificate discovery and completeness
-for all failed couplings remain separate obligations. The certificate proofs need no
+These are sound certificates, checked by Lean. Certificate discovery is optional
+follow-on work; completeness for all failed couplings is outside the current plan.
+The certificate proofs need no
 Strassen theorem and are independent of the probabilistic syntax and loop rules.
+
+## Observations and internal contracts
+
+`Prob.pushforward f μ` maps each state to its deterministic observation and aggregates
+the resulting weights. It preserves mass, addition, scaling, and increasing limits.
+`Coupled.pushforward` transports exact couplings through compatible left/right maps,
+and `quadSem.observe` transports a judgment through a postcondition implication.
+These definitions live in `Prob/Observation.lean`; the asynchronous marginal proof
+reuses them without changing its theorem names.
+
+`BugCert.refutes_of_observation` lets a certificate for observed outputs refute an
+internal weighted contract. The certificate's concrete inputs must satisfy the
+precondition, and the contract must imply the observed coupling. No injectivity or
+normalization assumption is added. In the search case this refutes the very same
+`resultSpec` proved for the correct optimization, replacing early exit with cached
+randomness. See [the case study](randomized-search.md).
 
 ## Increasing limits and algebraic boundaries
 
@@ -224,8 +285,9 @@ and `BugCert.refutes_prhl` transport quantitative refutation; the fair/biased ex
 uses the existing finite-event certificate to reject an actual pRHL sample specification.
 
 This is a semantic equivalence with named admissible rules for the current language.
-An inductive derivation translation, external procedure/module interfaces, and
-semiring abstraction remain separate work. See the
+An inductive derivation translation and external procedure/module interfaces remain
+optional separate work. The semiring factory now provides `Generic.prhl_iff_quad` for
+arbitrary admissible scalar kernels and compatibility with this concrete bridge. See the
 [rule inventory and scope](prhl-subsumption.md).
 
 ## Guarded unrolling and ranked mixed scheduling
@@ -264,8 +326,17 @@ checks their proofs and includes all their declarations in the existing axiom ga
 The gate permits only `propext`, `Classical.choice`, and `Quot.sound` transitively.
 The Set development must continue to pass without changing its semantics or examples.
 
-The integrated step 7 check passed on 2026-09-19: 1,570 build jobs and 2,143 library declarations,
-all using only the permitted standard axioms.
+The historical observation/API check passed on 2026-09-21: 1,578 build jobs and 2,321
+library declarations, all using only the permitted standard axioms. Shared-algebra,
+scalar-instance, and generic-loop modules are also included in the current root import
+and gate; this historical count does not include them.
+The integrated generalization check passed on 2026-09-21: 1,613 build jobs and 3,088
+library declarations, no proof placeholders, and standard axioms only.
+
+The total-summation factory is a stated class of admissible models, not an encoding of
+every TOPLAS partial semiring. Finite-word languages describe terminating traces only.
+Continuous probability, approximate couplings, mixed demonic/probabilistic choice,
+operational adequacy, and completeness are not supplied by this generalization.
 
 The next milestones and their acceptance criteria are maintained in
 [`typeclass-plan.md`](../typeclass-plan.md).

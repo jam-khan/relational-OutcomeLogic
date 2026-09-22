@@ -24,6 +24,28 @@ Command outputs from individual states are subprobabilities. Couplings have exac
 marginals, so both sides must have equal termination probability. Divergence is
 permitted on both sides. This is not a divergence-insensitive lifting.
 
+## Shared semiring bridge
+
+`Generic/WeightedLogic.lean` now proves `RelOL.Generic.prhl_iff_quad` for the weights
+constructed from any `SummationSemiring K`. Here `prhl R k l S` is the statewise
+exact-coupling judgment for kernels; its equivalent outcome judgment uses the shared
+assertion and sequencing algebra. Coupling composition is proved from scalar summation
+laws and does not require commutative multiplication.
+
+`Generic/LoopCoupling.lean` and `Generic/AsyncLoop.lean` expose the corresponding
+`Generic.prhl_while` and `Generic.prhl_while_async` under the explicit ordered,
+increasing-limit assumptions. Both construct a product execution and prove its exact
+marginals. `Generic/WeightedCertificates.lean` supplies finite-event and concrete-input
+refutations in each scalar's order. [Semiring models](semiring-models.md) gives the
+five checked instances and their concrete clients.
+
+The ENNReal specialization is linked to the existing APIs by
+`Generic.ennreal_couple_eq`, `ennreal_prhl_iff`, and `ennreal_prhl_commands_iff` in
+`Generic/Compatibility.lean`. The rule inventory below remains the concrete
+`RelOL.Prob` command API, including its normalized sampling and whole-loop losslessness
+rules. The generic kernel development does not claim a new normalized language for
+every scalar instance.
+
 ## Exposed rule inventory
 
 | Rule | Lean theorem | Main obligation |
@@ -76,6 +98,13 @@ are the commands' lifted semantics. Both refutation methods require an input pai
 satisfying the pRHL precondition. Failure to find a correctness proof does not itself
 produce a certificate.
 
+The [search case](randomized-search.md) also bridges observed-output certificates
+back to richer weighted contracts. `BugCert.refutes_of_observation` refutes an
+internal postcondition that requires the failed observed coupling. This lets the
+cached-randomness example fail exactly the quantitative contract proved for early
+exit, with the concrete input precondition checked. The [theorem guide](theorem-guide.md)
+provides client imports and the two statements.
+
 ## What has and has not been embedded
 
 This milestone supplies semantic equivalence and named admissible rules for skip,
@@ -90,7 +119,9 @@ allows joint divergence, while unilateral phases must decrease the chosen natura
 There is also no embedding of external procedure, module, oracle, or call semantics,
 and no compatibility claim for external proof scripts. The generic kernel bridge is
 a possible integration point once an external development exposes matching semantics.
-It does not by itself establish such a match. Arbitrary fair or almost-sure phase scheduling,
-approximate couplings, continuous distributions, and generic-semiring coupling theory
-are outside the present theorem. The semantics is denotational; no separate operational
+It does not by itself establish such a match. Arbitrary fair or almost-sure phase
+scheduling, approximate couplings, and continuous distributions remain outside the
+present theorem. Generic-semiring coupling, certificates, and ranked loop rules are
+now implemented under explicit assumptions; this does not provide every partial
+weight algebra or external language feature. The semantics is denotational; no separate operational
 semantics or operational adequacy theorem has been supplied.
