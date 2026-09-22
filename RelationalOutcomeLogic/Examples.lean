@@ -10,6 +10,7 @@ import RelationalOutcomeLogic.Examples.Probability.Coins
 import RelationalOutcomeLogic.Examples.Probability.GeometricRetry
 import RelationalOutcomeLogic.Examples.Probability.GuardedUnrolling
 import RelationalOutcomeLogic.Examples.Probability.MassDeficit
+import RelationalOutcomeLogic.Examples.Probability.ParallelSampling.Case
 import RelationalOutcomeLogic.Examples.Probability.RetryCoupling
 import RelationalOutcomeLogic.Examples.Probability.Search.Alignment
 import RelationalOutcomeLogic.Examples.Probability.Search.CachedRandomness

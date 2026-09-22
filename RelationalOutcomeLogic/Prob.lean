@@ -1,11 +1,13 @@
 import RelationalOutcomeLogic.Prob.Coupling.Assertions
 import RelationalOutcomeLogic.Prob.Coupling.AsynchronousLoop
 import RelationalOutcomeLogic.Prob.Coupling.Basic
+import RelationalOutcomeLogic.Prob.Coupling.Expectation
 import RelationalOutcomeLogic.Prob.Coupling.Observation
 import RelationalOutcomeLogic.Prob.Coupling.Restriction
 import RelationalOutcomeLogic.Prob.Coupling.Support
 import RelationalOutcomeLogic.Prob.Coupling.SynchronousLoop
 import RelationalOutcomeLogic.Prob.Logic.Assertions
+import RelationalOutcomeLogic.Prob.Logic.DistributionalLoop
 import RelationalOutcomeLogic.Prob.Logic.FiniteOutcomes
 import RelationalOutcomeLogic.Prob.Logic.Judgment
 import RelationalOutcomeLogic.Prob.Logic.OneSided

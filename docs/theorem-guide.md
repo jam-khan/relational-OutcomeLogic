@@ -195,6 +195,36 @@ The mixed rule permits joint divergence and arbitrary rank resets on joint steps
 It does not cover unbounded stochastic unilateral phases merely from almost-sure
 termination. See [loop alignment](loop-alignment.md) for boundary examples.
 
+## Parallel scientific sampling
+
+Import `RelationalOutcomeLogic.Examples.Probability.ParallelSampling.Case`.
+The [case guide](parallel-sampling.md) gives the source correspondence and proof
+dependencies. Names below are relative to `RelOL.Prob.ParallelSampling`.
+
+| Result | Declaration |
+| --- | --- |
+| Local scheduler continuation rule | `poolKernelLayer_contract` |
+| Rule-derived event interpreter | `poolFuel_quad`, `poolFuel_observed` |
+| Fresh-launch reconstruction | `event_reconstruction_quad`, `event_loop_quad` |
+| Actual capped joint contract | `freshCollector_contract`, `freshCollector_quad`, `freshCollector_split` |
+| Fully drained batch policy | `batchCollector_contract`, `batchCollector_accounting` |
+| Actual uncapped increasing limit | `uncappedCollector_eq_iSup_interior` |
+| Uncapped full population and termination | `uncappedCollector_answer`, `uncappedCollector_probability` |
+| Joint population and stopping count | `uncappedCollector_record` |
+| Complete uncapped outcome contract | `uncapped_outcome_contract`, `uncapped_outcome_quad` |
+| Exact mean stopping count | `uncappedCollector_expected_committed` |
+| Speculative work | `uncappedCollector_support_work`, `uncappedCollector_expected_started_le` |
+| Worker/window capacity | `eventRun_initial_capacity` |
+| Completion-order certificates | `completionRace_population_contract_refuted`, `fairTwoRaceBug`, `fairEightRaceBug` |
+| Duplicate-result certificate | `duplicate_population_contract_refuted` |
+| Adaptive generations | `adaptive_quad`, `adaptive_equal` |
+| Look-ahead validation and stale fault | `validateLookahead_quad`, `validated_generation`, `stale_population_contract_refuted` |
+
+The reusable loop rule is `RelOL.Prob.quad_lifted_while`. Expectation transport is
+`RelOL.Prob.Coupled.expectation_le`; continuity is
+`RelOL.Weight.expectation_iSup`. The concrete scheduler and the auxiliary abstract
+window protocol have distinct work behavior, including at zero quota.
+
 ## Claims and validation
 
 The search case supplies an end-to-end correctness contract and its quantitative
@@ -235,3 +265,9 @@ jobs, 127 source modules, and 3,836 audited declarations. It covers the derived
 buffer/decoder proofs, full-trace fuel independence, general and clipped round
 laws, concrete geometric clients, and generalized privacy certificates. No proof
 placeholders or nonstandard axioms were found.
+
+After parallel scientific sampling on 2026-09-22, the full gate passed with 1,825
+build jobs, 157 source modules, and 4,899 audited declarations. It includes the
+actual capped and uncapped worker pools, full joint population/stopping-count
+law, speculation bounds, batch policy, adaptive sequencing, and fault certificates.
+No proof placeholders or nonstandard axioms were found.

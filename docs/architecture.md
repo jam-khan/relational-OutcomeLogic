@@ -32,8 +32,9 @@ RelationalOutcomeLogic/
 ├── Prob/
 │   ├── Semantics/     Commands, Loop
 │   ├── Coupling/      Basic, Assertions, Observation, Restriction, Support,
-│   │                  SynchronousLoop, AsynchronousLoop
-│   ├── Logic/         Assertions, Judgment, Rules, OneSided, FiniteOutcomes
+│   │                  SynchronousLoop, AsynchronousLoop, Expectation
+│   ├── Logic/         Assertions, Judgment, Rules, OneSided, FiniteOutcomes,
+│   │                  DistributionalLoop
 │   ├── Refutation/    EventMass, Certificate, Observation
 │   └── Transformations/ GuardedUnroll
 ├── Subsumption/
@@ -47,6 +48,9 @@ RelationalOutcomeLogic/
 │   │                  GuardedUnrolling, AsynchronousLoops, AlgebraBoundaries
 │   │   ├── Search/    Programs, Alignment, OutcomeContract, Cost,
 │   │                  CachedRandomness, Case
+│   │   ├── ParallelSampling/  Model, Outcomes, Correctness, UncappedCorrectness,
+│   │   │              UncappedRecord, Work, Adaptive, Versioning, Case;
+│   │   │              Reference/, Scheduler/, Window/, Faults/
 │   │   └── SpeculativeDecoding/  Programs, Correction, StepContract, Refinement,
 │   │                  DecoderRules, Buffered, Fuel, Costs, OutcomeContracts, RoundLaw,
 │   │                  RoundExpectation, RoundClipping, Counterexamples,
@@ -71,6 +75,17 @@ Concrete Set and probabilistic semantics and rules live in their own directories
 `Subsumption/` gives the embedded logics, while `Bridges/` proves agreement between
 the generic and concrete developments. Examples sit above the library layers.
 No library module imports an example.
+
+The [parallel-sampling case](parallel-sampling.md) groups sequential rejection
+sampling in `Reference/`, actual worker-pool events and their rule derivation in
+`Scheduler/`, an auxiliary pending-window protocol in `Window/`, and quantitative
+mutants in `Faults/`. Top-level files compose these proofs into capped and uncapped
+population/work contracts. `Case` is the public entry point.
+Its library changes are the full-loop reconstruction rule in
+`Prob/Logic/DistributionalLoop`, expectation transport in
+`Prob/Coupling/Expectation`, and increasing-limit expectation laws in
+`Algebra/ENNReal/Expectation`. Guard agreement and local body obligations remain
+explicit; the new reconstruction rule is not an unrestricted asynchronous rule.
 
 The [speculative-decoding case](speculative-decoding.md) is self-contained under
 `Examples/Probability/SpeculativeDecoding/`. Its reusable additions have explicit

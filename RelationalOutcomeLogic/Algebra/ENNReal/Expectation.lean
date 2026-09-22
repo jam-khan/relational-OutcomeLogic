@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Algebra.ENNReal.Basic
+import RelationalOutcomeLogic.Algebra.ENNReal.Limits
 
 /-!
 # Nonnegative expectations of discrete outcome weights
@@ -62,6 +62,17 @@ theorem expectation_mono_on_support (μ : Weight α) {f g : α → ℝ≥0∞}
   by_cases ha : μ a = 0
   · simp [ha]
   · exact mul_le_mul_right (h a ha) _
+
+/-- Enlarging an outcome weight can only increase a nonnegative expectation. -/
+theorem expectation_mono_weight {μ ν : Weight α} (h : μ ≤ ν) (f : α → ℝ≥0∞) :
+    expectation μ f ≤ expectation ν f :=
+  ENNReal.tsum_le_tsum (fun a => mul_le_mul_left (h a) _)
+
+/-- Nonnegative costs pass to the increasing limit of terminating executions. -/
+theorem expectation_iSup (μ : Nat → Weight α) (hμ : Monotone μ) (f : α → ℝ≥0∞) :
+    expectation (⨆ n, μ n) f = ⨆ n, expectation (μ n) f := by
+  simp only [expectation, iSup_apply, ENNReal.iSup_mul]
+  exact tsum_iSup_of_monotone _ (fun i j hij a => mul_le_mul_left (hμ hij a) _)
 
 theorem expectation_congr_on_support (μ : Weight α) {f g : α → ℝ≥0∞}
     (h : ∀ a ∈ support μ, f a = g a) : expectation μ f = expectation μ g := by
