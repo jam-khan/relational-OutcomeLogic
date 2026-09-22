@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Rules
+import RelationalOutcomeLogic.Set.Rules
 
 /-!
 # `symexec`: forward execution on concrete stores
@@ -20,7 +20,7 @@ macro_rules
   | `(tactic| symexec [$ts,*] $[$loc:location]?) =>
     `(tactic| simp only [$ts,*, semLift_singleton, sem_seq, sem_assign, sem_skip, sem_choice,
         Cmd.add_def, kleisli_singleton, kleisli_union, kleisli_insert, kleisli_empty,
-        sem_ite_pos, sem_ite_neg, sem_while_pos, sem_while_neg, st_x, st_low,
+        sem_ite_pos, sem_ite_neg, sem_while_pos, sem_while_neg,
         Function.update_self, Function.update_of_ne, ne_eq, String.reduceEq,
         Int.reduceLT, Int.reduceLE, Int.reduceGT, Int.reduceGE, Int.reduceAdd, Int.reduceSub,
         Int.reduceMul, Int.reduceEq, Int.reduceNeg, Int.reduceMod,

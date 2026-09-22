@@ -2,7 +2,7 @@
 
 Historical snapshot: the findings and recommended next steps below describe the
 checkout before the weighted implementation. Several then-missing layers are now
-implemented; see the [current roadmap](../typeclass-plan.md) for their status.
+implemented; see the [current theorem guide](../docs/theorem-guide.md) for their status.
 
 Preliminary de-risking of the proposed outcome abstraction, pRHL embedding, probabilistic loops,
 and quantitative refutation. Production Lean modules and dependency configuration were not changed.

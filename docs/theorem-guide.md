@@ -1,5 +1,10 @@
 # Using the shared and probabilistic developments
 
+For a guided first pass, use the [study plan](study/README.md),
+[printable inference rules](study/rules.pdf), and
+[checked source index](study/theorem-index.md). The exercises there are intended
+for independent paper proofs before reading the existing Lean proofs.
+
 The weighted logic proves properties of actual terminating output weights. Its
 couplings have exact marginals, so related outputs have equal termination mass.
 Assertions may additionally split outcomes and constrain each piece's mass.
@@ -8,20 +13,28 @@ The same structural rules, exact-coupling construction, finite-event certificate
 and synchronous/ranked asynchronous loop proofs now also apply to admissible scalar
 semirings. The original Set and probability interfaces remain available.
 
+The [repository structure](architecture.md) separates reusable semantics and logic
+from examples. Import paths below follow the current layout; Lean declaration
+namespaces remain stable.
+
 ## Shared algebra and scalar models
 
 | Need | Definition or theorem | Import |
 | --- | --- | --- |
-| Additive outcomes and Kleisli sequencing | `RelOL.OutcomeModel` | `Algebra.OutcomeModel` |
+| Additive outcomes and Kleisli sequencing | `RelOL.OutcomeModel` | `Algebra.Outcome.Basic` |
+| Shared transformer and kernel judgments | `RelOL.Generic.quadSem`, `quad` | `Generic.Judgment` |
 | Shared assertions, splitting, sequencing, and choice | `RelOL.Generic.oplus`, `quad_split`, `quad_seq`, `quad_choice` | `Generic.Rules` |
-| Scalar assumptions for infinite discrete weights | `RelOL.Algebra.SummationSemiring`, `OmegaSummationSemiring` | `Algebra.Scalar`, `Algebra.OrderedScalar` |
-| Construct weights, sequencing, and exact joints | `RelOL.Algebra.Weighted.Weight`, `bind`, `Coupled.bind` | `Algebra.WeightedCoupling` |
-| Statewise coupling as an outcome-logic fragment | `RelOL.Generic.prhl_iff_quad` | `Generic.WeightedLogic` |
-| Full least-fixed-point loop semantics | `RelOL.Generic.loopSem`, `loopSem_eq_lfp` | `Generic.Iteration` |
-| Synchronous and ranked mixed loop rules | `RelOL.Generic.prhl_while`, `prhl_while_async` | `Generic.LoopCoupling`, `Generic.AsyncLoop` |
-| Quantitative refutation in the scalar order | `RelOL.Generic.MassDeficitCert.refutes`, `BugCert.refutes` | `Generic.WeightedCertificates` |
-| Recover existing Set/probability semantics | `set_loopSem_eq`, `weight_loopSem_eq`, `ennreal_prhl_commands_iff` | `Generic.Compatibility` |
-| Boolean weights as Set outcomes | `RelOL.Generic.BooleanBridge.encode_loopSem`, `coupled_iff` | `Generic.BooleanBridge` |
+| Scalar assumptions for infinite discrete weights | `RelOL.Algebra.SummationSemiring`, `OmegaSummationSemiring` | `Algebra.Scalar.Basic`, `Algebra.Scalar.Order` |
+| Construct weights, sequencing, and exact joints | `RelOL.Algebra.Weighted.Weight`, `bind`, `Coupled.bind` | `Algebra.Weighted.Coupling` |
+| Statewise coupling as an outcome-logic fragment | `RelOL.Generic.prhl_iff_quad` | `Generic.Coupling` |
+| Full least-fixed-point loop semantics | `RelOL.Generic.loopSem`, `loopSem_eq_lfp` | `Generic.Loops.Semantics` |
+| Synchronous and ranked mixed loop rules | `RelOL.Generic.prhl_while`, `prhl_while_async` | `Generic.Loops.Synchronous`, `Generic.Loops.Asynchronous` |
+| Quantitative refutation in the scalar order | `RelOL.Generic.MassDeficitCert.refutes`, `BugCert.refutes` | `Generic.Refutation` |
+| Scalar-weight observations and finite-event bounds | `RelOL.Algebra.Weighted.pushforward`, `eventMass`, `IsCoupling.eventMass_le` | `Algebra.Weighted.Observation`, `Algebra.Weighted.Events` |
+| Weighted loop unfolding and support invariants | `RelOL.Algebra.Weighted.loopSem_support_invariant` | `Generic.Loops.Support` |
+| Recover existing Set semantics | `RelOL.Generic.set_loopSem_eq` | `Bridges.Set` |
+| Recover existing probability semantics and pRHL | `RelOL.Generic.weight_loopSem_eq`, `ennreal_prhl_commands_iff` | `Bridges.Probability` |
+| Boolean weights as Set outcomes | `RelOL.Generic.BooleanBridge.encode_loopSem`, `coupled_iff` | `Bridges.Boolean` |
 
 Prefix imports with `RelationalOutcomeLogic.`. The five implemented scalar instances
 are Boolean reachability, extended nonnegative probability weights, extended-natural
@@ -29,20 +42,22 @@ trace counts, tropical minimum costs, and finite-word trace languages. The last 
 noncommutative concatenation. [Semiring models](semiring-models.md) records the actual
 operations, assumptions, examples, and differences from the TOPLAS model family.
 
-`Generic.InstanceExamples` runs the same route and countdown programs in the first
+`Examples.Algebra.Routes` runs the same route and countdown programs in the first
 four models, including count/cost certificates for changes invisible to reachability.
-`Generic.TraceExamples` checks ordered logging and rejects swapped logs.
-`Generic.AsyncExamples` instantiates a shared schedule with joint weighted steps and
-unilateral bookkeeping. These are executions of the constructed weighted models.
+`Examples.Algebra.Traces` checks ordered logging and rejects swapped logs.
+`Examples.Algebra.AsynchronousCountdown` instantiates a shared schedule with joint
+weighted steps and unilateral bookkeeping. These are executions of the constructed
+weighted models. Their declaration namespaces remain `RelOL.Generic.InstanceExamples`,
+`RelOL.Generic.TraceExamples`, and `RelOL.Generic.AsyncExamples`, respectively.
 
 ## Start with the complete case
 
-Import `RelationalOutcomeLogic.Prob.SearchCase` for the randomized-search commands,
+Import `RelationalOutcomeLogic.Examples.Probability.Search.Case` for the randomized-search commands,
 correctness results, quantitative contract, trial savings, and bug certificate.
 The two main statements use the same initial weights and postcondition:
 
 ```lean
-import RelationalOutcomeLogic.Prob.SearchCase
+import RelationalOutcomeLogic.Examples.Probability.Search.Case
 
 open RelOL RelOL.Prob RelOL.Prob.Search
 
@@ -68,14 +83,15 @@ All entries below are in `RelOL.Prob` unless qualified otherwise.
 
 | Need | Definition or theorem | Import |
 | --- | --- | --- |
-| Arbitrary weighted outcome transformers, possibly with different input/output types | `quadSem F G P Q` | `Prob.Quadruple` |
-| Commands with weighted pre/postconditions | `quad P c d Q` | `Prob.Lang` |
-| Pointwise exact-coupling correctness | `prhl R c d S`, `prhlSem` | `Subsumption.PRHL` |
-| Transfer between pointwise correctness and weighted assertions | `prhl_iff_quad`, `prhlSem_iff_quadSem` | `Subsumption.PRHL` |
-| Preserve branch masses while splitting a joint | `IsCoupling.restrict`, `Coupled.split_mass` | `Prob.Restriction` |
-| Project outputs through deterministic observations | `pushforward`, `Coupled.pushforward`, `quadSem.observe` | `Prob.Observation` |
-| Refute correctness with a quantitative witness | `MassDeficitCert.refutes`, `BugCert.refutes` | `Prob.BugCert` |
-| Refute a richer contract using an observed-output certificate | `BugCert.refutes_of_observation` | `Prob.Observation` |
+| Arbitrary weighted outcome transformers, possibly with different input/output types | `quadSem F G P Q` | `Prob.Logic.Judgment` |
+| Commands with weighted pre/postconditions | `quad P c d Q` | `Prob.Semantics.Commands` |
+| Pointwise exact-coupling correctness | `prhl R c d S`, `prhlSem` | `Subsumption.PRHL.Embedding` |
+| Transfer between pointwise correctness and weighted assertions | `prhl_iff_quad`, `prhlSem_iff_quadSem` | `Subsumption.PRHL.Embedding` |
+| Preserve branch masses while splitting a joint | `IsCoupling.restrict`, `Coupled.split_mass` | `Prob.Coupling.Restriction` |
+| Project outputs through deterministic observations | `pushforward`, `Coupled.pushforward` | `Prob.Coupling.Observation` |
+| Transport whole outcome judgments to observations | `quadSem.observe` | `Prob.Refutation.Observation` |
+| Refute correctness with a quantitative witness | `MassDeficitCert.refutes`, `BugCert.refutes` | `Prob.Refutation.Certificate` |
+| Refute a richer contract using an observed-output certificate | `BugCert.refutes_of_observation` | `Prob.Refutation.Observation` |
 
 Prefix the import column with `RelationalOutcomeLogic.`. The root
 `RelationalOutcomeLogic` import also exposes the entire development.
@@ -142,3 +158,8 @@ Every production module is imported by the root. The allowed axioms are `propext
 presentation and the choice of modeling assumptions still require source review.
 The integrated generalization check passed on 2026-09-21: 1,613 build jobs and 3,088
 library declarations, no proof placeholders, and only these standard axioms.
+
+After the structure pass on 2026-09-22, the full gate passed with 1,628 build jobs
+and 3,090 declarations. The structure check covers 106 modules, and the API comparison
+preserved every public mathematical declaration name. The two additional declarations
+are generated simplification helpers, not new logic rules.

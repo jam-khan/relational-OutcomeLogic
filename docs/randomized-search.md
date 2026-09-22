@@ -5,7 +5,7 @@ optimization that stops at the first hit. A faulty implementation reuses the fir
 trial. The development covers every natural-number budget and normalized trial
 distribution, with explicit hypotheses where a strict probability gap is needed.
 
-Import `RelationalOutcomeLogic.Prob.SearchCase` for the full example. The
+Import `RelationalOutcomeLogic.Examples.Probability.Search.Case` for the full example. The
 [theorem guide](theorem-guide.md) shows the correctness and refutation statements
 side by side.
 
@@ -128,14 +128,15 @@ restriction lemmas are in `RelOL.Prob`; weight restriction is in `RelOL.Weight`.
 
 | Module | Main declarations |
 | --- | --- |
-| [`Prob/Search.lean`](../RelationalOutcomeLogic/Prob/Search.lean) | `Trial`, `full`, `early`, `full_sem_false`, `failure_add_success`, `full_isProbability` |
-| [`Prob/SearchCoupling.lean`](../RelationalOutcomeLogic/Prob/SearchCoupling.lean) | `schedule`, `full_early_prhl`, `outputJoint_isCoupling`, `observed_equal`, `cost_coupling` |
-| [`Prob/Restriction.lean`](../RelationalOutcomeLogic/Prob/Restriction.lean) | `Weight.restrict`, `IsCoupling.restrict`, `Coupled.split_mass` |
-| [`Prob/SearchOutcome.lean`](../RelationalOutcomeLogic/Prob/SearchOutcome.lean) | `resultSpec`, `result_split`, `search_outcome_quad`, `resultSpec_mass_one` |
-| [`Prob/SearchCost.lean`](../RelationalOutcomeLogic/Prob/SearchCost.lean) | `mem_savingEvent_iff_consumed`, `early_savingEvent_mass_ge_hit`, `positive_saving_probability` |
-| [`Prob/SearchCertificates.lean`](../RelationalOutcomeLogic/Prob/SearchCertificates.lean) | `cached_bug`, `cached_spec_refuted`, `cached_full_supports_equal`, `fair_two_false_event_masses` |
-| [`Prob/SearchCase.lean`](../RelationalOutcomeLogic/Prob/SearchCase.lean) | Complete case import; `cached_outcome_spec_refuted` |
-| [`Prob/Observation.lean`](../RelationalOutcomeLogic/Prob/Observation.lean) | `pushforward`, `Coupled.pushforward`, `quadSem.observe`, `BugCert.refutes_of_observation` |
+| [`Examples/Probability/Search/Programs.lean`](../RelationalOutcomeLogic/Examples/Probability/Search/Programs.lean) | `Trial`, `full`, `early`, `full_sem_false`, `failure_add_success`, `full_isProbability` |
+| [`Examples/Probability/Search/Alignment.lean`](../RelationalOutcomeLogic/Examples/Probability/Search/Alignment.lean) | `schedule`, `full_early_prhl`, `outputJoint_isCoupling`, `observed_equal`, `cost_coupling` |
+| [`Prob/Coupling/Restriction.lean`](../RelationalOutcomeLogic/Prob/Coupling/Restriction.lean) | `Weight.restrict`, `IsCoupling.restrict`, `Coupled.split_mass` |
+| [`Examples/Probability/Search/OutcomeContract.lean`](../RelationalOutcomeLogic/Examples/Probability/Search/OutcomeContract.lean) | `resultSpec`, `result_split`, `search_outcome_quad`, `resultSpec_mass_one` |
+| [`Examples/Probability/Search/Cost.lean`](../RelationalOutcomeLogic/Examples/Probability/Search/Cost.lean) | `mem_savingEvent_iff_consumed`, `early_savingEvent_mass_ge_hit`, `positive_saving_probability` |
+| [`Examples/Probability/Search/CachedRandomness.lean`](../RelationalOutcomeLogic/Examples/Probability/Search/CachedRandomness.lean) | `cached_bug`, `cached_spec_refuted`, `cached_full_supports_equal`, `fair_two_false_event_masses` |
+| [`Examples/Probability/Search/Case.lean`](../RelationalOutcomeLogic/Examples/Probability/Search/Case.lean) | Complete case import; `cached_outcome_spec_refuted` |
+| [`Prob/Coupling/Observation.lean`](../RelationalOutcomeLogic/Prob/Coupling/Observation.lean) | `pushforward`, `Coupled.pushforward` |
+| [`Prob/Refutation/Observation.lean`](../RelationalOutcomeLogic/Prob/Refutation/Observation.lean) | `quadSem.observe`, `BugCert.refutes_of_observation` |
 
 All listed modules are root-imported and covered by `./scripts/check.sh`.
 

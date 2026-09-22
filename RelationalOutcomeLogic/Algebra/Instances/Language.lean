@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Algebra.OrderedScalar
+import RelationalOutcomeLogic.Algebra.Scalar.Order
 import Mathlib.Computability.Language
 import Mathlib.Order.CompleteLattice.Finset
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic

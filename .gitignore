@@ -6,3 +6,12 @@ notes/main.pdf
 .claude/
 context.md
 notes/probes/
+
+# Generated document and script artifacts; keep the requested PDFs.
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+__pycache__/

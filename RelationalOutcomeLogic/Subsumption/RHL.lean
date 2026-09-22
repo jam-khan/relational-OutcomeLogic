@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Rules
+import RelationalOutcomeLogic.Set.Rules
 
 /-! # Relational Hoare Logic is the weak-atom fragment of RelOL -/
 

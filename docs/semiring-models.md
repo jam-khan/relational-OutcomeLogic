@@ -8,12 +8,13 @@ The comparison point is Outcome Logic's algebra and examples in
 
 ## What is shared
 
-[`OutcomeModel`](../RelationalOutcomeLogic/Algebra/OutcomeModel.lean) supplies
+[`OutcomeModel`](../RelationalOutcomeLogic/Algebra/Outcome/Basic.lean) supplies
 empty outcomes, additive choice, pure outcomes, and Kleisli sequencing. Its laws
 include an additive commutative monoid, the monad laws, and distributivity of
 sequencing over choice. They do not require idempotent addition. The assertions,
 additive splitting, and structural rules in
-[`Generic/Assertions.lean`](../RelationalOutcomeLogic/Generic/Assertions.lean) and
+[`Generic/Assertions.lean`](../RelationalOutcomeLogic/Generic/Assertions.lean),
+[`Generic/Judgment.lean`](../RelationalOutcomeLogic/Generic/Judgment.lean), and
 [`Generic/Rules.lean`](../RelationalOutcomeLogic/Generic/Rules.lean) use this interface.
 
 The scalar construction uses `Weighted.Weight K α = α → K`. It separates the
@@ -27,10 +28,10 @@ additional assumptions instead of claiming that every semiring supports loops:
 | `OmegaSummationSemiring K` | A complete lattice with zero as bottom, monotonicity, and preservation of increasing sequential limits by summation and multiplication. These derive the common least-fixed-point loop semantics. |
 
 The interfaces are in
-[`Scalar.lean`](../RelationalOutcomeLogic/Algebra/Scalar.lean) and
-[`OrderedScalar.lean`](../RelationalOutcomeLogic/Algebra/OrderedScalar.lean).
-[`WeightedModel.lean`](../RelationalOutcomeLogic/Algebra/WeightedModel.lean) and
-[`WeightedOrder.lean`](../RelationalOutcomeLogic/Algebra/WeightedOrder.lean)
+[`Algebra/Scalar/Basic.lean`](../RelationalOutcomeLogic/Algebra/Scalar/Basic.lean) and
+[`Algebra/Scalar/Order.lean`](../RelationalOutcomeLogic/Algebra/Scalar/Order.lean).
+[`Algebra/Weighted/Outcome.lean`](../RelationalOutcomeLogic/Algebra/Weighted/Outcome.lean) and
+[`Algebra/Weighted/Iteration.lean`](../RelationalOutcomeLogic/Algebra/Weighted/Iteration.lean)
 construct the outcome and iteration instances. All five models below satisfy
 these assumptions, including positivity and absence of zero divisors.
 
@@ -60,7 +61,7 @@ For every instance, the chosen sum equals the supremum of all finite subsums:
 
 ## Programs and refutations
 
-[`InstanceExamples.routes`](../RelationalOutcomeLogic/Generic/InstanceExamples.lean)
+[`InstanceExamples.routes`](../RelationalOutcomeLogic/Examples/Algebra/Routes.lean)
 chooses a direct edge to node 2 or two edges through node 1. The single proof
 `routes_sem` computes its weight as `direct + first * second`;
 `routes_coupled` certifies collapsing the routes to that weight.
@@ -79,15 +80,18 @@ preserves the possible answer while reducing its weight from 2 to 1:
 the cheaper tropical route is certified by `tropical_drop_route_certificate`:
 the numerical cost changes from 5 to 7. Both use the generic finite-event
 certificate machinery in
-[`WeightedCertificates.lean`](../RelationalOutcomeLogic/Generic/WeightedCertificates.lean).
+[`Generic/Refutation.lean`](../RelationalOutcomeLogic/Generic/Refutation.lean).
+Its finite-event algebra and coupling bounds are isolated in
+[`Algebra/Weighted/Events.lean`](../RelationalOutcomeLogic/Algebra/Weighted/Events.lean),
+independent of relational assertions and certificates.
 
-[`WeightedPrograms.countdown_sem`](../RelationalOutcomeLogic/Generic/WeightedPrograms.lean)
+[`WeightedPrograms.countdown_sem`](../RelationalOutcomeLogic/Examples/Algebra/Countdown.lean)
 proves once that a loop with `n` weighted steps has outcome `r^n` at counter zero.
 Its instances give certain reachability, `2^n` traces, probability weight `q^n`,
 and numerical cost `n • d`. The probability example proves mass at most one
 when `q ≤ 1`; counting weight two is proved equal to two unit-weight branches.
 
-[`AsyncExamples`](../RelationalOutcomeLogic/Generic/AsyncExamples.lean) also reuses
+[`AsyncExamples`](../RelationalOutcomeLogic/Examples/Algebra/AsynchronousCountdown.lean) also reuses
 one genuinely asynchronous proof. A slow machine separates each weighted step
 from a bookkeeping step; a fast machine combines them. The schedule alternates
 joint and left-only steps, using a decreasing phase rank for the latter.
@@ -95,7 +99,7 @@ joint and left-only steps, using a decreasing phase rank for the latter.
 after forgetting the slow machine's phase, and `slow_mass` gives `r^n`.
 Boolean, counting, probability, and tropical specializations are included.
 
-[`TraceExamples`](../RelationalOutcomeLogic/Generic/TraceExamples.lean) checks the
+[`TraceExamples`](../RelationalOutcomeLogic/Examples/Algebra/Traces.lean) checks the
 noncommutative case: two successive logging actions emit `[a,b]`; swapping
 distinct actions fails exact coupling. Branching records both execution orders,
 and the shared countdown proof gives repeated emitted words.
@@ -103,14 +107,21 @@ and the shared countdown proof gives repeated emitted words.
 ## Compatibility and scope
 
 The existing concrete developments remain connected to the abstraction.
-[`Generic/Concrete.lean`](../RelationalOutcomeLogic/Generic/Concrete.lean) supplies
-the Set and existing ENNReal outcome models and judgment equations.
-[`Generic/Compatibility.lean`](../RelationalOutcomeLogic/Generic/Compatibility.lean)
-identifies their loop semantics and the existing probabilistic couplings and
-pRHL judgments with the generic ones.
-[`Generic/BooleanBridge.lean`](../RelationalOutcomeLogic/Generic/BooleanBridge.lean)
+[`Bridges/Set.lean`](../RelationalOutcomeLogic/Bridges/Set.lean) supplies
+the Set outcome and iteration instances and identifies the Set assertions,
+judgments, and full loops with the shared constructions.
+[`Bridges/Probability.lean`](../RelationalOutcomeLogic/Bridges/Probability.lean)
+supplies the corresponding ENNReal instances and equations, including exact
+couplings and pRHL judgments.
+[`Bridges/Boolean.lean`](../RelationalOutcomeLogic/Bridges/Boolean.lean)
 identifies Set outcomes with Boolean weights, preserving sequencing, loops, and
 exact relational couplings.
+
+All scalar examples live under `Examples/Algebra/`; their existing
+`RelOL.Generic.*` declaration namespaces are retained. Deterministic observation
+laws live in `Algebra/Weighted/Observation.lean`, and weighted loop support laws
+live in `Generic/Loops/Support.lean`, so using these facts does not import the
+asynchronous scheduler proof.
 
 The relation to the TOPLAS models has these precise limits:
 

@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Algebra.OrderedScalar
+import RelationalOutcomeLogic.Algebra.Scalar.Order
 import Mathlib.Order.PropInstances
 import Mathlib.Order.CompleteLattice.Basic
 import Mathlib.Order.CompleteLattice.Finset

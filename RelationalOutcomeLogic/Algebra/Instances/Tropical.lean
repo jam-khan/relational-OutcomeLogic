@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Algebra.OrderedScalar
+import RelationalOutcomeLogic.Algebra.Scalar.Order
 import Mathlib.Algebra.Tropical.Basic
 import Mathlib.Data.ENNReal.Operations
 import Mathlib.Order.CompleteLattice.Basic

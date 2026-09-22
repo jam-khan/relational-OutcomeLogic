@@ -1,5 +1,5 @@
-import RelationalOutcomeLogic.Algebra.OrderedScalar
-import RelationalOutcomeLogic.Algebra.WeightOrder
+import RelationalOutcomeLogic.Algebra.Scalar.Order
+import RelationalOutcomeLogic.Algebra.ENNReal.Limits
 
 /-!
 # Extended nonnegative weights

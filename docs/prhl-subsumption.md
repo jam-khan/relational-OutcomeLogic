@@ -1,8 +1,14 @@
 # pRHL subsumption: theorem, rules, and scope
 
 The mechanization proves that exact-coupling pRHL is the coupling-assertion fragment
-of weighted RelOL. Both use the existing probabilistic commands and their terminating
+of pRelOL. Both use the existing probabilistic commands and their terminating
 output weights; no second command semantics is introduced.
+
+The concrete bridge and core rules live in `Subsumption/PRHL/Embedding.lean`,
+one-sided rules in `Subsumption/PRHL/OneSided.lean`, and ranked mixed rules in
+`Subsumption/PRHL/Asynchronous.lean`. Examples live separately under
+`Examples/Subsumption/ProbabilisticHoare.lean`. Rules retain the `RelOL.Prob`
+namespace; the examples retain `RelOL.Prob.PRHLExamples`.
 
 ## Semantic bridge
 
@@ -26,22 +32,23 @@ permitted on both sides. This is not a divergence-insensitive lifting.
 
 ## Shared semiring bridge
 
-`Generic/WeightedLogic.lean` now proves `RelOL.Generic.prhl_iff_quad` for the weights
+`Generic/Coupling.lean` now proves `RelOL.Generic.prhl_iff_quad` for the weights
 constructed from any `SummationSemiring K`. Here `prhl R k l S` is the statewise
 exact-coupling judgment for kernels; its equivalent outcome judgment uses the shared
 assertion and sequencing algebra. Coupling composition is proved from scalar summation
 laws and does not require commutative multiplication.
 
-`Generic/LoopCoupling.lean` and `Generic/AsyncLoop.lean` expose the corresponding
+`Generic/Loops/Synchronous.lean` and `Generic/Loops/Asynchronous.lean` expose the corresponding
 `Generic.prhl_while` and `Generic.prhl_while_async` under the explicit ordered,
 increasing-limit assumptions. Both construct a product execution and prove its exact
-marginals. `Generic/WeightedCertificates.lean` supplies finite-event and concrete-input
-refutations in each scalar's order. [Semiring models](semiring-models.md) gives the
+marginals. `Algebra/Weighted/Events.lean` supplies finite-event bounds, while
+`Generic/Refutation.lean` packages finite-event and concrete-input refutations in
+each scalar's order. [Semiring models](semiring-models.md) gives the
 five checked instances and their concrete clients.
 
 The ENNReal specialization is linked to the existing APIs by
 `Generic.ennreal_couple_eq`, `ennreal_prhl_iff`, and `ennreal_prhl_commands_iff` in
-`Generic/Compatibility.lean`. The rule inventory below remains the concrete
+`Bridges/Probability.lean`. The rule inventory below remains the concrete
 `RelOL.Prob` command API, including its normalized sampling and whole-loop losslessness
 rules. The generic kernel development does not claim a new normalized language for
 every scalar instance.
@@ -80,7 +87,7 @@ The right-only rule uses the opposite projection. `LosslessOn P c` means that
 
 ## Correctness and refutation examples
 
-`Subsumption/PRHLExamples.lean` checks:
+`Examples/Subsumption/ProbabilisticHoare.lean` checks:
 
 1. Opposite Boolean encodings of unbounded fair-coin retry, using `prhl_sample` and
    `prhl_while`, then exporting the proof through `prhl_iff_quad`.

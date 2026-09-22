@@ -1,6 +1,8 @@
 # Weighted semantics contract
 
-Status: steps 1–9, including shared algebra and semiring generalization, 2026-09-21.
+Status: steps 1–9, including shared algebra and semiring generalization, complete.
+Module paths and component boundaries were refreshed on 2026-09-22 for the
+[repository organization](architecture.md); current work is study and consolidation.
 The existing Set logic remains the regression reference. The weighted development includes assertions, exact
 couplings, quantitative refutation, and a probabilistic while-language with synchronous
 loop soundness. The pRHL embedding adds core and one-sided rules, with explicit
@@ -12,9 +14,10 @@ correctness/refutation case.
 ## Shared algebra and constructed scalar models
 
 `OutcomeModel M` supplies additive outcomes and Kleisli sequencing. Shared assertion
-and judgment proofs live in `Generic/Assertions.lean` and `Generic/Rules.lean`;
-`Generic/Concrete.lean` instantiates these operations with Set union and ENNReal
-addition and proves compatibility with the existing assertion and judgment APIs.
+and judgment proofs live in `Generic/Assertions.lean`, `Generic/Judgment.lean`, and
+`Generic/Rules.lean`. `Bridges/Set.lean` instantiates these operations with Set union;
+`Bridges/Probability.lean` uses ENNReal addition. Each bridge proves compatibility
+with its concrete assertion and judgment API.
 
 The separate scalar factory constructs `Algebra.Weighted.Weight K α := α → K`.
 `SummationSemiring K` extends the assumptions on a semiring with an explicit arbitrary
@@ -39,14 +42,16 @@ a predicate on ENNReal weights. Tropical inequalities use reverse numerical orde
 language multiplication concatenates words and is noncommutative. See the
 [model comparison and checked clients](semiring-models.md).
 
-`Generic/Compatibility.lean` identifies the old Set/ENNReal full loops and ENNReal
-couplings and pRHL judgments with the shared definitions. `Generic/BooleanBridge.lean`
+`Bridges/Set.lean` and `Bridges/Probability.lean` identify their concrete full loops
+with shared iteration. The probability bridge additionally equates ENNReal
+couplings and pRHL judgments with the shared definitions. `Bridges/Boolean.lean`
 also proves that Boolean weighted sequencing and full loops recover Set execution,
 and exact Boolean marginals recover bitotal Set coupling. Existing specialized theorem
 names and probabilistic commands remain available.
 
-Generic finite-event bounds and `MassDeficitCert`/`BugCert` now work in the chosen
-scalar order. Their proofs derive finite-event bounds from the summation laws and
+Generic finite-event bounds in `Algebra/Weighted/Events.lean` and
+`MassDeficitCert`/`BugCert` in `Generic/Refutation.lean` work in the chosen scalar
+order. Their proofs derive finite-event bounds from the summation laws and
 monotonicity; they need no additional finite-event axiom. The count and tropical
 clients use these certificates to reject a route deletion with unchanged possible
 destination states. The sections below retain the ENNReal-specific probability contract.
@@ -184,8 +189,10 @@ Strassen theorem and are independent of the probabilistic syntax and loop rules.
 the resulting weights. It preserves mass, addition, scaling, and increasing limits.
 `Coupled.pushforward` transports exact couplings through compatible left/right maps,
 and `quadSem.observe` transports a judgment through a postcondition implication.
-These definitions live in `Prob/Observation.lean`; the asynchronous marginal proof
-reuses them without changing its theorem names.
+Pushforward and coupling transport live in `Prob/Coupling/Observation.lean`;
+judgment transport and observed certificates live in `Prob/Refutation/Observation.lean`.
+The asynchronous marginal proof depends only on the observation algebra, without
+importing refutation machinery. Existing theorem names are retained.
 
 `BugCert.refutes_of_observation` lets a certificate for observed outputs refute an
 internal weighted contract. The certificate's concrete inputs must satisfy the
@@ -245,7 +252,7 @@ separate program approximations as marginals. Its increasing limit yields the lo
 coupling, with the invariant and both exit conditions. Neither losslessness nor a
 finite iteration bound is assumed.
 
-`Prob.Rules` lifts these facts into weighted judgments: consequence, skip, sequencing,
+`Prob.Logic.Rules` lifts these facts into weighted judgments: consequence, skip, sequencing,
 additive splitting, common scaling, assignment, sampling, synchronized conditionals,
 and synchronous while.
 
@@ -338,5 +345,5 @@ every TOPLAS partial semiring. Finite-word languages describe terminating traces
 Continuous probability, approximate couplings, mixed demonic/probabilistic choice,
 operational adequacy, and completeness are not supplied by this generalization.
 
-The next milestones and their acceptance criteria are maintained in
-[`typeclass-plan.md`](../typeclass-plan.md).
+The [theorem guide](theorem-guide.md) records the current APIs and limitations;
+the [study checkpoint](study/README.md) provides the reading and proof exercises.

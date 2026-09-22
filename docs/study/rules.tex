@@ -1,0 +1,638 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,microtype}
+\usepackage[margin=21mm,headheight=15pt]{geometry}
+\usepackage{amsmath,amssymb,mathtools,mathpartir}
+\usepackage{booktabs,tabularx,array,enumitem,xcolor}
+\usepackage{fancyhdr,hyperref}
+\definecolor{ink}{HTML}{173A52}
+\definecolor{muted}{HTML}{52616B}
+\hypersetup{colorlinks=true,linkcolor=ink,urlcolor=ink,
+  pdftitle={Probabilistic Relational Outcome Logic (pRelOL): Implemented Rules},
+  pdfauthor={pRelOL study checkpoint}}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{muted}pRelOL}
+\fancyhead[R]{\small\color{muted}Study checkpoint / prototype-3}
+\fancyfoot[L]{\small\color{muted}22 September 2026}
+\fancyfoot[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{2em}
+\setlist{nosep,leftmargin=1.5em,topsep=4pt}
+\renewcommand{\arraystretch}{1.25}
+\newcommand{\scope}[1]{\textcolor{muted}{\small\textbf{Scope.} #1}\par\medskip}
+\newcommand{\nextpage}[2]{\clearpage\section{#1}\scope{#2}}
+\newcommand{\src}[1]{\par\smallskip{\small\textcolor{muted}{\textbf{Lean source:}} \path{#1}}\par}
+\newcommand{\Qd}[4]{\{#1\}\;#2\sim#3\;\{#4\}}
+\newcommand{\Prh}[4]{[\,#1\,]\;#2\sim#3\;[\,#4\,]}
+\newcommand{\Cpl}[3]{\mathsf{Cpl}_{#1}(#2,#3)}
+\newcommand{\cp}[1]{\mathsf{couple}(#1)}
+\newcommand{\bind}{\mathbin{\gg\!=}}
+\newcommand{\pure}{\eta}
+\newcommand{\emp}{\mathsf{emp}}
+\newcommand{\ex}[2]{\mathsf{exactly}(#1,#2)}
+\newcommand{\mass}{\mathsf{mass}}
+\newcommand{\supp}{\mathsf{supp}}
+\newcommand{\while}[2]{\mathsf{while}\ #1\ \mathsf{do}\ #2}
+\newcommand{\sk}{\mathsf{skip}}
+\newcommand{\cond}[3]{\mathsf{if}\ #1\ \mathsf{then}\ #2\ \mathsf{else}\ #3}
+\newcommand{\sample}[1]{\mathsf{sample}(#1)}
+\newcommand{\assign}[1]{\mathsf{assign}(#1)}
+\newcommand{\Loop}{\mathsf{Loop}}
+\newcommand{\Rge}{\mathbb{R}_{\geq 0}^{\infty}}
+\newcommand{\Ninf}{\mathbb{N}^{\infty}}
+\newcommand{\mEq}[2]{\mathsf{massEq}(#1,#2)}
+\newcommand{\rulelabel}[1]{\textsc{#1}}
+
+\begin{document}
+\begin{center}
+{\LARGE\bfseries\color{ink}Probabilistic Relational}\\[3pt]
+{\LARGE\bfseries\color{ink}Outcome Logic (pRelOL)}\\[5pt]
+{\Large Implemented rules}\\[7pt]
+{\small A reading and pencil-proof companion to the Lean development}\\[3pt]
+{\small Mathematical baseline: \texttt{prototype-3}, commit \texttt{3542464}}\\[3pt]
+{\small Source paths refreshed for the reorganized repository}
+\end{center}
+
+\section{The objects being related}
+\scope{This handbook selects the core implemented rules. It is not an exhaustive
+API listing or a claim of completeness. The companion theorem index links the
+statements to their Lean proofs.}
+
+A state relation $R(a,b)$ talks about two individual states. An \emph{outcome
+assertion} $P(x,y)$ talks about two whole collections of outcomes. Keep these
+levels separate throughout a proof.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Symbol & Meaning \\
+\midrule
+$M\alpha$ & Outcomes over states of type $\alpha$. Sets and weighted functions are instances. \\
+$0,\ x+y,\ \pure a$ & Empty outcome, additive combination, and pure outcome. \\
+$x\bind k$ & Run a state kernel $k:\alpha\to M\gamma$ from every outcome in $x$. \\
+$P\Rightarrow Q$ & $\forall x,y,\ P(x,y)\Rightarrow Q(x,y)$. \\
+$P^{\mathsf T}(y,x)$ & $P(x,y)$, with the two arguments exchanged. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+The common kernel judgment is
+\[
+ \boxed{\Qd{P}{k}{l}{Q}\ \Longleftrightarrow\
+ \forall x,y,\ P(x,y)\Rightarrow Q(x\bind k,y\bind l).}
+\]
+For arbitrary outcome transformers $F,G$, replace the final pair by $(F(x),G(y))$;
+Lean calls that judgment \path{quadSem}. For commands, use their semantic kernels.
+
+Assertions used repeatedly below are
+\begin{align*}
+ \emp(x,y)&\iff x=0\ \land\ y=0,\\
+ \ex{x_0}{y_0}(x,y)&\iff x=x_0\ \land\ y=y_0,\\
+ (P\oplus Q)(x,y)&\iff \exists x_1,x_2,y_1,y_2,\quad
+ x=x_1+x_2\ \land\ y=y_1+y_2\\[-2pt]
+ &\hspace{32mm}{}\land P(x_1,y_1)\land Q(x_2,y_2).
+\end{align*}
+Thus $\oplus$ decomposes both outcomes. It is different from logical disjunction,
+which simply asks whether $P(x,y)$ or $Q(x,y)$ holds. Pieces may have overlapping
+support; their weights still add.
+
+\textbf{How to use this packet.} Read a rule, write out its quantifiers, try its
+proof on paper, and only then inspect Lean. Use \path{README.md} for the study
+schedule, \path{exercises.md} for exercises, and \path{theorem-index.md} for exact
+declaration names. Paths here are relative to \path{docs/study/}; source paths
+below are relative to \path{RelationalOutcomeLogic/}. Module paths have changed;
+Lean declaration namespaces are preserved.
+\src{Generic/Assertions.lean}
+\src{Generic/Judgment.lean}
+
+\nextpage{Shared structural rules}{Any \texttt{OutcomeModel}: an additive commutative
+monoid with the pure/bind monad laws, zero annihilation, and distributivity of bind
+over addition in both arguments. No idempotence or normalization is assumed.}
+
+Write $(k;k')(a)=k(a)\bind k'$ and $(k+k')(a)=k(a)+k'(a)$.
+\begin{mathpar}
+ \inferrule*[right=Skip]{ }{\Qd{P}{\pure}{\pure}{P}}
+ \and
+ \inferrule*[right=Consequence]{P'\Rightarrow P\quad \Qd{P}{k}{l}{Q}\quad Q\Rightarrow Q'}
+ {\Qd{P'}{k}{l}{Q'}}
+ \\
+ \inferrule*[right=Sequence]{\Qd{P}{k}{l}{Q}\\\Qd{Q}{k'}{l'}{S}}
+ {\Qd{P}{k;k'}{l;l'}{S}}
+ \and
+ \inferrule*[right=Swap]{\Qd{P}{k}{l}{Q}}
+ {\Qd{P^{\mathsf T}}{l}{k}{Q^{\mathsf T}}}
+ \\
+ \inferrule*[right=Split]{\Qd{P_1}{k}{l}{Q_1}\\\Qd{P_2}{k}{l}{Q_2}}
+ {\Qd{P_1\oplus P_2}{k}{l}{Q_1\oplus Q_2}}
+ \\
+ \inferrule*[right=Additive-choice]{\Qd{P}{k_1}{l_1}{Q_1}\\\Qd{P}{k_2}{l_2}{Q_2}}
+ {\Qd{P}{k_1+k_2}{l_1+l_2}{Q_1\oplus Q_2}}
+ \\
+ \inferrule*[right=Disjunction]{\Qd{P_1}{k}{l}{Q}\\\Qd{P_2}{k}{l}{Q}}
+ {\Qd{P_1\lor P_2}{k}{l}{Q}}
+\end{mathpar}
+
+\textbf{Empty outcomes and exact inputs.}
+\[
+ \Qd{\emp}{k}{l}{\emp},\qquad
+ \Qd{P}{(\lambda a.\,0)}{(\lambda b.\,0)}{\emp}.
+\]
+\[
+ \Qd{\ex{x}{y}}{k}{l}{Q}\iff Q(x\bind k,y\bind l).
+\]
+The empty assertion is satisfiable at $(0,0)$; it is different from the always-false
+assertion. An empty-output kernel has no terminating outcomes.
+
+\textbf{Why splitting works.} If $x=x_1+x_2$, bind yields
+$(x_1\bind k)+(x_2\bind k)$. These two actual output pieces witness the conclusion.
+For arbitrary transformers $F,G$, this rule needs their additivity as an explicit
+premise; it does not follow merely from their type.
+
+\textbf{Why choice has a different precondition.} Both branch pairs start from
+the same $x,y$. Their outputs are then added. Over probability weights, adding
+two normalized kernels has mass two: this is a rule for raw weighted kernels,
+not a probabilistic command that secretly chooses a branch with probability $1/2$.
+
+\src{Generic/Rules.lean}
+\textbf{Main names:} \path{quad_seq}, \path{quad_split}, \path{quad_choice}.
+
+\nextpage{Weights and exact couplings}{A semiring $K$ equipped with
+\texttt{SummationSemiring}. Multiplication need not commute. Positivity and
+absence of zero divisors are not premises of coupling composition.}
+
+An outcome is a function $\mu:\alpha\to K$. The chosen indexed sum defines
+\[
+ \pure a(x)=\begin{cases}1&x=a,\\0&x\ne a,\end{cases}
+ \qquad (\mu\bind k)(z)=\sum_a\mu(a)\,k(a)(z),
+ \qquad \mass(\mu)=\sum_a\mu(a).
+\]
+Support means nonzero weight: $\supp(\mu)=\{a\mid\mu(a)\ne0\}$.
+
+A joint $J:\alpha\times\beta\to K$ is an exact $R$-coupling of $\mu,\nu$ when
+\[
+ \forall a,\ \sum_b J(a,b)=\mu(a),\qquad
+ \forall b,\ \sum_a J(a,b)=\nu(b),\qquad
+ J(a,b)\ne0\Rightarrow R(a,b).
+\]
+Write $\Cpl{R}{\mu}{\nu}$ for existence of such a joint and
+$\cp{R}(\mu,\nu)$ for the corresponding outcome assertion.
+
+\begin{mathpar}
+ \inferrule*[right=Pure]{R(a,b)}{\Cpl{R}{\pure a}{\pure b}}
+ \and
+ \inferrule*[right=Add]{\Cpl{R}{\mu_1}{\nu_1}\\\Cpl{R}{\mu_2}{\nu_2}}
+ {\Cpl{R}{\mu_1+\mu_2}{\nu_1+\nu_2}}
+ \\
+ \inferrule*[right=Scale]{\Cpl{R}{\mu}{\nu}}
+ {\Cpl{R}{r\mu}{r\nu}}
+ \and
+ \inferrule*[right=Weaken]{\Cpl{R}{\mu}{\nu}\\\forall a,b,\ R(a,b)\Rightarrow S(a,b)}
+ {\Cpl{S}{\mu}{\nu}}
+ \\
+ \inferrule*[right=Bind]{\Cpl{R}{\mu}{\nu}\\
+ \forall a,b,\ R(a,b)\Rightarrow\Cpl{S}{k(a)}{l(b)}}
+ {\Cpl{S}{\mu\bind k}{\nu\bind l}}
+\end{mathpar}
+Here $r\mu$ multiplies each weight on the \emph{left}. A bind witness is built
+by choosing a continuation joint $J_{a,b}$ and summing
+$J(a,b)\,J_{a,b}(c,d)$ over $(a,b)$, in that multiplication order.
+
+Two consequences are especially useful:
+\[
+ \Cpl{R}{\mu}{\nu}\Rightarrow\mass(\mu)=\mass(\nu),\qquad
+ \Cpl{=}{\mu}{\nu}\iff\mu=\nu.
+\]
+For probabilities, exact couplings match termination mass as well as outcomes.
+A bad cross pair does not by itself refute existence of a suitable joint.
+
+\src{Algebra/Weighted/Coupling.lean}
+\textbf{Main names:} \path{Coupled.bind}, \path{Coupled.mass_eq},
+\path{coupled_eq_iff}.
+
+\nextpage{The pRHL fragment and command rules}{The bridge is generic for weighted
+kernels. The command rules here use \texttt{Prob.Cmd} with ENNReal weights.
+Every sampling constructor carries a proof of mass one at every input state.}
+
+Define the statewise judgment by
+\[
+ \Prh{R}{k}{l}{S}\iff
+ \forall a,b,\ R(a,b)\Rightarrow\Cpl{S}{k(a)}{l(b)}.
+\]
+The proved semantic equivalence is
+\[
+ \boxed{\Prh{R}{k}{l}{S}\iff\Qd{\cp{R}}{k}{l}{\cp{S}}.}
+\]
+Forward: compose an input coupling with the statewise joints. Backward: apply the
+outcome judgment to related pure inputs. This explains how the two interfaces
+share proofs. It is not a translation of an external procedure or module language.
+
+\begin{mathpar}
+ \inferrule*[right=Assign]{\forall a,b,\ R(a,b)\Rightarrow S(f(a),g(b))}
+ {\Prh{R}{\assign{f}}{\assign{g}}{S}}
+ \\
+ \inferrule*[right=Sample]{\forall a,\mass(k(a))=1\quad\forall b,\mass(l(b))=1\\
+ \forall a,b,\ R(a,b)\Rightarrow\Cpl{S}{k(a)}{l(b)}}
+ {\Prh{R}{\sample{k}}{\sample{l}}{S}}
+ \\
+ \inferrule*[right=If]{R\Rightarrow(g\leftrightarrow h)\\
+ \Prh{R\land g}{c_1}{d_1}{S}\\\Prh{R\land\neg g}{c_2}{d_2}{S}}
+ {\Prh{R}{\cond{g}{c_1}{c_2}}{\cond{h}{d_1}{d_2}}{S}}
+\end{mathpar}
+Here $g$ tests the left state and $h$ the right. Skip, consequence, sequence,
+symmetry, and input case analysis are also implemented.
+
+\textbf{One-sided steps.} Assignment on the left against skip requires
+$R(a,b)\Rightarrow S(f(a),b)$. Left sampling against skip requires normalization
+and
+\[
+ R(a,b)\Rightarrow\forall t\in\supp(k(a)),\ S(t,b).
+\]
+A left conditional against any fixed right command $d$ is proved with two
+premises, under $R\land g$ and $R\land\neg g$; it needs no right guard.
+Right-sided counterparts follow by symmetry.
+
+\textbf{Quantitative assertion rule.} If $\Qd{P}{c}{d}{Q}$ then
+$\Qd{r\cdot P}{c}{d}{r\cdot Q}$, where
+$(r\cdot P)(\mu,\nu)\iff\exists\mu_0,\nu_0,\ \mu=r\mu_0\land\nu=r\nu_0\land P(\mu_0,\nu_0)$.
+This is an image assertion, not division by $r$.
+
+\src{Generic/Coupling.lean}
+\src{Subsumption/PRHL/Embedding.lean}
+\src{Subsumption/PRHL/OneSided.lean}
+\src{Prob/Logic/Rules.lean}
+
+\nextpage{Loop semantics and synchronous reasoning}{Generic iteration uses
+\texttt{IterationModel} and complete lattices of outcomes. Weighted loop couplings
+use \texttt{OmegaSummationSemiring}. One-sided losslessness below uses probability.}
+
+The finite approximants count loop unfoldings, starting with no terminating output:
+\begin{align*}
+ L_0(s)&=0,\\
+ L_{n+1}(s)&=\begin{cases}k(s)\bind L_n&g(s),\\\pure s&\neg g(s),\end{cases}\\
+ \Loop(g,k)(s)&=\sup_n L_n(s).
+\end{align*}
+The sequence is increasing. Bind preserves its increasing limit, yielding both
+the unfolding equation and the least-fixed-point characterization:
+\[
+ \Loop(g,k)(s)=
+ \begin{cases}k(s)\bind\Loop(g,k)&g(s),\\\pure s&\neg g(s).\end{cases}
+\]
+An always-true loop has empty terminating semantics. Probability commands have
+termination mass at most one; missing mass represents nontermination.
+
+\begin{mathpar}
+ \inferrule*[right=While-sync]{R\Rightarrow(g\leftrightarrow h)\\
+ \Prh{R\land g}{k}{l}{R}}
+ {\Prh{R}{\Loop(g,k)}{\Loop(h,l)}{R\land\neg g\land\neg h}}
+\end{mathpar}
+There is no separate termination premise. The proof builds one product execution
+whose increasing joint approximants have the required marginals. Arbitrarily chosen
+finite couplings need not form an increasing sequence, so they cannot simply be
+passed to the limit. The outcome-level version replaces brackets by coupling
+assertions using the pRHL bridge.
+
+\textbf{A loop against skip needs more.} Let
+\[
+ \mathsf{LosslessOn}(A,c)\iff
+ \forall a,\ A(a)\Rightarrow\mass(\mathsf{sem}(c)(a))=1.
+\]
+\begin{mathpar}
+ \inferrule*[right=While-left]{\Prh{R\land g}{c}{\sk}{R}\\
+ \mathsf{LosslessOn}(\lambda a.\exists b,\ R(a,b),\while{g}{c})}
+ {\Prh{R}{\while{g}{c}}{\sk}{R\land\neg g}}
+\end{mathpar}
+This premise concerns the \emph{whole loop}. A lossless body is insufficient:
+$\while{\mathsf{true}}{\sk}$ has mass zero, whereas skip has mass one. Exact
+marginals cannot relate them. The right-sided theorem is symmetric.
+
+\src{Generic/Loops/Semantics.lean}
+\src{Generic/Loops/Synchronous.lean}
+\src{Subsumption/PRHL/OneSided.lean}
+
+\nextpage{Ranked asynchronous loops}{Ordered summation semirings; probability and
+Set interfaces also exist. The schedule is supplied by the proof author. No
+automatic invariant or scheduler discovery is implemented.}
+
+Two loops need not advance together. A scheduler chooses a mode for each state
+pair $p=(a,b)$ and a rank $\rho(p)\in\mathbb N$. All obligations below are required
+whenever the invariant $R(a,b)$ holds and that mode is selected.
+
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Mode & Guard obligation & Required local coupling \\
+\midrule
+Left & $g(a)$ & Couple $k(a)$ with $\pure b$, supported by $R$ and strict rank decrease. \\
+Right & $h(b)$ & Couple $\pure a$ with $l(b)$, supported by $R$ and strict rank decrease. \\
+Both & $g(a)\land h(b)$ & Couple $k(a)$ with $l(b)$, supported by $R$. \\
+Done & $\neg g(a)\land\neg h(b)$ & Exit; no body step. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+More precisely, for a unilateral step from $p$, the coupling relation is
+\[
+ R_{<p}(x,y)\iff R(x,y)\land\rho(x,y)<\rho(p).
+\]
+The left obligation is $\Cpl{R_{<p}}{k(a)}{\pure b}$; the right is
+$\Cpl{R_{<p}}{\pure a}{l(b)}$. The both obligation is
+$\Cpl{R}{k(a)}{l(b)}$.
+
+\begin{mathpar}
+ \inferrule*[right=While-async]{\text{A schedule satisfying the four obligations above}}
+ {\Prh{R}{\Loop(g,k)}{\Loop(h,l)}{R\land\neg g\land\neg h}}
+\end{mathpar}
+
+\textbf{What the theorem proves.} The chosen local joints define a product loop.
+Its full output joint has the \emph{original two loops} as exact marginals. These
+marginal equations are a theorem, not extra promises hidden in the schedule.
+
+\textbf{What the rank ensures.} Every supported unilateral successor lowers the
+natural rank. Consequently an uninterrupted unilateral phase cannot continue
+forever. Both-mode steps may reset the rank, and infinitely many joint steps may
+still diverge. There is no uniform global bound on the number of loop steps.
+
+Coupling a unilateral body with a pure state also forces that body's total weight
+to be one. In probability this is losslessness of the selected step.
+
+\textbf{Boundary to remember.} Almost-sure termination of an unbounded random
+retry phase does not supply this strict support-wise rank. The existing mixed rule
+does not cover such a phase merely from its probability-one termination proof.
+The separate lossless loop-versus-skip rule on the previous page can handle cases
+outside this scheduler's premises.
+
+\src{Generic/Loops/Asynchronous.lean}
+\textbf{Main names:} \path{AsyncSchedule}, \path{AsyncSchedule.isCoupling_loop},
+\path{prhl_while_async}, \path{quad_couple_while_async}.
+
+\nextpage{Quantitative refutation certificates}{Probability weights, or the generic
+ordered summation-semiring instance. Only the selected events must be finite;
+whole output distributions need not have finite support.}
+
+For finite $A\subseteq\alpha$ and $B\subseteq\beta$, write
+$\mu(A)=\sum_{a\in A}\mu(a)$. Define the cover condition by
+\[
+ \mathsf{Cover}(R,A,B)\iff
+ \forall a\in A,\ \forall b,\ R(a,b)\Rightarrow b\in B.
+\]
+The quantifier over $b$ is global, including states outside the support of $\nu$.
+Every exact coupling obeys the event bound
+\[
+ \Cpl{R}{\mu}{\nu}\ \land\ \mathsf{Cover}(R,A,B)
+ \quad\Rightarrow\quad \mu(A)\leq\nu(B).
+\]
+Hence a \texttt{MassDeficitCert} stores $A,B$, their cover proof, and a strict gap:
+\begin{mathpar}
+ \inferrule*[right=Deficit]{\mathsf{Cover}(R,A,B)\\\nu(B)<\mu(A)}
+ {\neg\Cpl{R}{\mu}{\nu}}
+ \and
+ \inferrule*[right=Bounds]{\mathsf{Cover}(R,A,B)\\
+ L\leq\mu(A)\quad\nu(B)\leq U\quad U<L}
+ {\neg\Cpl{R}{\mu}{\nu}}
+\end{mathpar}
+Two lower bounds cannot establish a deficit. In particular, finite loop unrolling
+usually gives a lower bound on terminating outcomes, not the right-side upper
+bound required here. No subtraction or division is used in the certificate.
+
+\textbf{Refuting the actual contract.} Let $F,G$ be the two actual outcome
+transformers. A violating pair of permitted inputs refutes the judgment:
+\begin{mathpar}
+ \inferrule*[right=Refute]{P(x,y)\\Q\Rightarrow\cp{R}\\
+ \neg\Cpl{R}{F(x)}{G(y)}}
+ {\neg\Qd{P}{F}{G}{Q}}
+\end{mathpar}
+Here the displayed judgment is the transformer version, \texttt{quadSem}.
+The program certificate \texttt{BugCert} fixes states $a_0,b_0$ and a deficit on
+$F(\pure a_0),G(\pure b_0)$; its use still requires the original precondition at
+those pure inputs. A failure to discover a joint is not a refutation theorem.
+
+\textbf{Concrete calculation.} Under equality, take $A=B=\{\mathsf{false}\}$.
+If one output assigns mass $1/2$ to false and the other assigns $1/4$, the cover
+is immediate and the strict gap refutes equality coupling. Matching supports
+do not repair the mismatch. This is the shape of the cached-randomness bug.
+
+\src{Prob/Refutation/Certificate.lean}
+\src{Algebra/Weighted/Events.lean}
+\src{Generic/Refutation.lean}
+\textbf{Main names:} \path{MassDeficitCert.refutes},
+\path{MassDeficitCert.of_bounds}, \path{BugCert.refutes_of_entails}.
+
+\nextpage{Observations, splitting, and the search contract}{The rich observation
+and mass-labelled splitting APIs here are implemented in the probability layer.
+Restrictions keep the original weights; they do not renormalize.}
+
+An observation $f:\alpha\to\gamma$ maps outputs by
+$f_*\mu=\mu\bind(\lambda a.\pure(f(a)))$. If
+$R(a,b)\Rightarrow S(f(a),g(b))$, then
+\[
+ \Cpl{R}{\mu}{\nu}\Rightarrow\Cpl{S}{f_*\mu}{g_*\nu}.
+\]
+A deficit on these \emph{actual observed outputs} refutes an internal contract $Q$
+when $Q(\mu,\nu)\Rightarrow\Cpl{S}{f_*\mu}{g_*\nu}$. One must also prove the
+certificate input satisfies the original precondition.
+
+Write $\mEq{p}{q}(\mu,\nu)$ for $\mass(\mu)=p\land\mass(\nu)=q$.
+\textbf{Split one joint by a shared event.} Suppose $\Cpl{R}{\mu}{\nu}$ and
+$R(a,b)\Rightarrow(E(a)\leftrightarrow D(b))$. Write $\mu|_E$ for restriction,
+$p=\mass(\mu|_E)$, and $q=\mass(\mu|_{\neg E})$. Then
+\[
+ \Bigl((\cp{R\land E\land D}\land\mEq{p}{p})\ \oplus\
+ (\cp{R\land\neg E\land\neg D}\land\mEq{q}{q})\Bigr)(\mu,\nu).
+\]
+The two pieces come from restricting the \emph{same joint}. Their marginals are
+exactly the corresponding restrictions, even when one piece has mass zero.
+
+\textbf{The implemented end-to-end example.} A trial has miss weight $q$ and hit
+weight $r$, with $q+r=1$. Both inputs are pure $(n,\mathsf{false})$: budget $n$
+and no hit yet. Full scan performs all trials; early exit stops at the first hit. Define
+\[
+ S_0=0,\qquad S_{n+1}=qS_n+r,\qquad q^n+S_n=1.
+\]
+The contract is a split into the following two outcome classes:
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Piece & Mass on each side & Coupled relation \\
+\midrule
+Failure & $q^n$ & Both answers are false; both remaining budgets are zero; each used $n$ trials. \\
+Success & $S_n$ & Both answers are true; early exit uses at most as many trials as full scan; full scan used $n$. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+\path{search_outcome_quad} proves this contract using asynchronous alignment and
+joint splitting. For $n\geq2$ and $r>0$, strict trial savings have positive
+probability. These are consumed-trial results, not an expected-runtime theorem.
+
+The faulty cached implementation samples once and reuses the answer. For
+$0<q<1$ and $n>1$, its failure probability is $q>q^n$. Observe only the answer
+flag, place cached output on the deficit's left, and transfer the contradiction
+back to the original contract. \path{cached_outcome_spec_refuted} refutes precisely
+the contract proved for early exit.
+
+\src{Prob/Coupling/Observation.lean}
+\src{Prob/Refutation/Observation.lean}
+\src{Prob/Coupling/Restriction.lean}
+\src{Examples/Probability/Search/Case.lean}
+
+\nextpage{The Set layer and the family loop rule}{Set outcomes use union as
+addition. This page records Set-specific APIs; the general weighted
+outcome-assertion family loop rule has not been implemented.}
+
+For sets $X,Y$, distinguish the following assertions:
+\begin{align*}
+ \mathsf{atomW}(R)(X,Y)&\iff\forall a\in X,\ \forall b\in Y,\ R(a,b),\\
+ \mathsf{atom}(R)(X,Y)&\iff X\ne\varnothing\land Y\ne\varnothing
+                  \land\mathsf{atomW}(R)(X,Y),\\
+ \mathsf{coupleL}(R)(X,Y)&\iff\forall a\in X,\ \exists b\in Y,\ R(a,b),\\
+ \cp{R}(X,Y)&\iff\mathsf{coupleL}(R)(X,Y)
+          \land\forall b\in Y,\ \exists a\in X,\ R(a,b).
+\end{align*}
+Bitotal coupling has a witness relation whose two projections are exactly $X,Y$.
+It can hold for two empty sets. Adding nonemptiness gives
+$\mathsf{coupleNE}(R)$, so
+\[
+ (\mathsf{coupleNE}(R)\oplus\top)(X,Y)
+ \iff\exists a\in X,\ \exists b\in Y,\ R(a,b).
+\]
+Without nonemptiness, $\cp{R}\oplus\top$ is always true by selecting an empty
+coupling piece. Refuting a product atom may use a bad reachable cross pair;
+refuting a coupling needs to rule out possible partners, not just one pairing.
+
+\textbf{Family loop rule.} Let $\phi_n$ describe active outcomes after $n$ body
+steps and $\psi_n$ outcomes that exit then. Require:
+\begin{enumerate}
+ \item $\phi_n(X,Y)$ forces every state of $X$ to satisfy $g$ and every state of $Y$ to satisfy $h$.
+ \item $\psi_n(X,Y)$ forces every state of $X$ to satisfy $\neg g$ and every state of $Y$ to satisfy $\neg h$.
+ \item For every $n$, $\Qd{\phi_n}{c}{d}{\phi_{n+1}\oplus\psi_{n+1}}$.
+ \item For \emph{every} family $E_n,E'_n$, if $\psi_n(E_n,E'_n)$ for all $n$, then
+ $\psi_\infty(\bigcup_n E_n,\bigcup_n E'_n)$. Lean calls this \texttt{Converges}.
+\end{enumerate}
+Then
+\[
+ \boxed{\Qd{\phi_0\oplus\psi_0}{\while{g}{c}}{\while{h}{d}}{\psi_\infty}.}
+\]
+There is no termination premise. All terminating exits are collected by the union.
+The convergence premise quantifies over arbitrary families satisfying $\psi_n$;
+it does not secretly assume these families are increasing.
+
+\textbf{One-sided choice.} From $\Qd{P}{c_1}{d}{Q_1}$ and
+$\Qd{P}{c_2}{d}{Q_2}$, Set RelOL derives
+$\Qd{P}{c_1+c_2}{d}{Q_1\oplus Q_2}$. This duplicates the passive outcome using
+$Y\cup Y=Y$. The same argument fails for non-idempotent probability addition.
+
+\src{Set/Assertions.lean}
+\src{Set/Coupling.lean}
+\src{Set/Rules.lean}
+
+\nextpage{Shared assumptions and the five scalar models}{The scalar construction
+uses total summation semirings. A bare semiring provides neither arbitrary indexed
+sums nor the order and continuity needed for full loops.}
+
+The assumptions have separate jobs:
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+Interface & What it provides \\
+\midrule
+\texttt{OutcomeModel} & Empty, addition, pure, bind; monoid, monad, and distributive laws. Shared structural rules. \\
+\texttt{SummationSemiring} & Chosen arbitrary indexed sums with singleton, addition, exchange, product-index, and left/right multiplication laws. Constructs weighted bind and couplings. \\
+\texttt{PositiveSummation} & A sum is zero iff all summands are zero. With no zero divisors, supplies exact support descriptions. \\
+\texttt{IterationModel} & Complete lattices of outcomes, empty as bottom, monotone bind, and preservation of increasing countable limits in the continuation. \\
+\texttt{OmegaSummationSemiring} & Complete scalar lattice with zero as bottom, monotone operations, and increasing-limit laws for sums and multiplication. Derives weighted iteration. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+All five implemented scalar models satisfy the required summation and increasing
+limit laws, as well as positivity and absence of zero divisors.
+\begin{center}
+\begin{tabularx}{\linewidth}{@{}l l l l X@{}}
+\toprule
+Model & $+$ & $\cdot$ & $0,1$ & Meaning \\
+\midrule
+Reachability & $\lor$ & $\land$ & false, true & Possible output \\
+$\Rge$ & $+$ & $\times$ & $0,1$ & Nonnegative weight \\
+$\Ninf$ & $+$ & $\times$ & $0,1$ & Trace count \\
+Tropical cost & $\min$ & $+$ & $\infty,0$ & Cheapest cost \\
+Word languages & $\cup$ & concat. & $\varnothing,\{\epsilon\}$ & Emitted finite words \\
+\bottomrule
+\end{tabularx}
+\end{center}
+For tropical costs the semantic order reverses numerical order, so semantic
+suprema become numerical infima. Language multiplication is noncommutative;
+the order of emissions matters. Languages may contain infinitely many finite words.
+ENNReal weights become probabilities only when
+the appropriate mass constraints are established.
+
+\textbf{One calculation, several meanings.} A direct route of weight $d$ or two
+successive edges of weights $a,b$ gives output weight $d+ab$. Boolean weights
+record reachability; unit counting weights give two traces; costs $7,2,3$ give
+minimum cost $5$. A weighted countdown gives $r^n\pure 0$ in all instances.
+
+\textbf{Scope.} This is not every partial algebra from Outcome Logic: operations
+are total, weights have no countable-support field, iteration uses increasing
+sequential limits, and trace words are finite. Compatibility theorems connect
+the generic construction to the existing Set and ENNReal developments.
+
+{\small\textcolor{muted}{\textbf{Lean sources:}}
+\path{Algebra/Scalar/Basic.lean}, \path{Algebra/Scalar/Order.lean},
+\path{Bridges/Set.lean}, \path{Bridges/Probability.lean},
+\path{Examples/Algebra/Routes.lean}.}
+
+\nextpage{A checkpoint before further development}{Use this page to test
+understanding after the exercises. The aim is to reconstruct why a proof is valid,
+not to memorize theorem names or read every file in order.}
+
+\textbf{Reconstruct these arguments without opening their proofs.}
+\begin{enumerate}[itemsep=7pt]
+ \item \textbf{Sequence and split.} Explain exactly where associativity and
+ additivity of bind enter. Give the witness decomposition for split.
+ \item \textbf{The pRHL bridge.} Prove both directions. Identify where related
+ pure inputs are used and where arbitrary coupled inputs are used.
+ \item \textbf{Coupling versus product atoms.} Give a finite example where an
+ equality coupling exists although a cross pair fails equality.
+ \item \textbf{Deficit certificate.} Calculate the two-coin event masses,
+ prove global cover, and state the original precondition and postcondition
+ implication needed to refute a program judgment.
+ \item \textbf{Synchronous limits.} Explain why a coherent increasing sequence
+ of joints is sufficient and unrelated finite witnesses are insufficient.
+ \item \textbf{Asynchronous alignment.} Draw a schedule for a machine with a
+ bookkeeping phase. Show the guard and rank obligation in each mode.
+ \item \textbf{Search.} Derive the budget-two result by hand, then explain the
+ arbitrary-budget proof using alignment, restriction, and a mass recurrence.
+ \item \textbf{Generalization.} Reinterpret one weighted calculation as
+ reachability, counting, cost, and a trace language. Identify the scalar laws used.
+\end{enumerate}
+
+\bigskip
+\textbf{What this checkpoint already contains.}
+\begin{itemize}[itemsep=3pt]
+ \item Set and weighted outcome assertions, exact couplings, and refutation.
+ \item Semantic exact-coupling pRHL equivalence and core command rules.
+ \item Full loop semantics, synchronous rules, lossless one-sided rules, and
+ ranked mixed asynchronous alignment.
+ \item The full-scan/early-exit contract and a cached-randomness refutation of
+ that same contract; shared algebra with five scalar instances and examples.
+\end{itemize}
+
+\bigskip
+\textbf{What remains a future direction.} Informed symbolic execution and
+coupling/certificate discovery, richer case studies, a general weighted
+outcome-family loop rule, broader asynchronous progress criteria, and external
+LeanCrypt integration. The current Set \texttt{symexec} is a simplification wrapper.
+These are not needed to complete the study checkpoint. Completeness is not a goal.
+
+\textbf{Reading question.} When comparing Outcome Logic, pRHL/product programs,
+and Quantitative Weakest Hyper Pre, distinguish semantic expressiveness from
+local proof rules, reusable invariants, automation, and empirical proof effort.
+This development does not establish a new expressiveness separation from QWHP.
+
+\textbf{Ready to resume?} Explain the search correctness and bug proofs from the
+definitions, reconstruct several small proofs independently, and list the exact
+assumptions of the next rule or tactic you want. Use the companion study plan
+for selected paper readings and a place to record unresolved questions.
+
+\end{document}

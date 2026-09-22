@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Algebra.OrderedScalar
+import RelationalOutcomeLogic.Algebra.Scalar.Order
 import Mathlib.Topology.Instances.ENat
 import Mathlib.Data.ENat.BigOperators
 import Mathlib.Topology.Algebra.InfiniteSum.Ring

@@ -1,4 +1,4 @@
-import RelationalOutcomeLogic.Algebra.OutcomeModel
+import RelationalOutcomeLogic.Algebra.Outcome.Basic
 
 /-! # Relational assertions shared by additive outcome models -/
 

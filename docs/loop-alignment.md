@@ -20,8 +20,8 @@ approximations of the transformed loop with original approximations at indices
 `2 * n + 1`. These indices are cofinal, so the increasing limits agree. Both programs
 therefore preserve the same divergence mass as well as terminating outputs.
 
-`Prob.UnrollExamples` uses a countdown and a Boolean accumulator updated by OR with a
-fresh fair bit. A pRHL sampling/while proof and semantic replacement establish guarded
+`Examples/Probability/GuardedUnrolling.lean` uses a countdown and a Boolean accumulator
+updated by OR with a fresh fair bit. A pRHL sampling/while proof and semantic replacement establish guarded
 unrolling correctness for every starting count and accumulator. A separate induction
 proves mass one for every finite count, so the example is not only a partial-correctness
 statement about possibly empty outputs.
@@ -74,14 +74,14 @@ does not need bitotal matching or these progress obligations.
 
 ## Generic scalar loops and schedules
 
-`Generic/Iteration.lean` defines full least-fixed-point iteration once over an
+`Generic/Loops/Semantics.lean` defines full least-fixed-point iteration once over an
 `IterationModel`. The weighted factory constructs this interface from
 `SummationSemiring` and `OmegaSummationSemiring`: scalar summation, zero as bottom,
 monotonicity, and increasing-limit continuity are explicit requirements. Exact
 support equivalences and commutative multiplication are not premises.
 
-`Generic/LoopCoupling.lean` proves synchronous exact couplings from one coherent
-increasing family of product executions. `Generic/AsyncLoop.lean` generalizes the
+`Generic/Loops/Synchronous.lean` proves synchronous exact couplings from one coherent
+increasing family of product executions. `Generic/Loops/Asynchronous.lean` generalizes the
 ranked mixed proof: `Algebra.Weighted.AsyncSchedule.isCoupling_loop` establishes both
 exact full-loop marginals, and `Generic.prhl_while_async` and
 `Generic.quad_couple_while_async` expose the result. The unilateral rank condition,
@@ -92,14 +92,14 @@ forces a unilateral step to be probabilistically lossless; in other models it me
 the corresponding scalar identity, not a claim about probability. The theorem derives
 the final marginal equations from local premises in all cases.
 
-The same generic schedule in `Generic/AsyncExamples.lean` alternates joint weighted
+The same generic schedule in `Examples/Algebra/AsynchronousCountdown.lean` alternates joint weighted
 steps and unilateral deterministic bookkeeping. Its instantiated clients recover
 Boolean outcomes, extended-natural counts, ENNReal weights, and tropical costs.
 All five [scalar instances](semiring-models.md), including noncommutative finite-word
 languages, meet the generic theorem assumptions.
 
-`Generic/Compatibility.lean` equates the existing Set/probability full loops with the
-shared iteration. `Generic/BooleanBridge.lean` also preserves full Set execution under
+`Bridges/Set.lean` and `Bridges/Probability.lean` equate their respective concrete
+full loops with shared iteration. `Bridges/Boolean.lean` also preserves full Set execution under
 Boolean encoding and equates exact Boolean couplings with bitotal Set couplings.
 The guarded unrolling client remains available under its existing `Prob` API.
 
@@ -115,7 +115,10 @@ The examples also check joint divergence and failure boundaries for missing prog
 or mass preservation. The later [randomized-search case](randomized-search.md) couples
 fresh trials before success and consumes the full scan's remaining trials unilaterally
 after early exit. It retains exact outcome probabilities and proves a strict-saving
-event bound. The generic projection helpers now live in `Prob/Observation.lean`.
+event bound. The ENNReal pushforward helpers live in `Prob/Coupling/Observation.lean`;
+their scalar-parametric counterparts live in `Algebra/Weighted/Observation.lean`.
+`Generic/Loops/Support.lean` contains the weighted unfolding and support-invariant
+lemmas. The ranked full-loop projection theorems remain in the asynchronous modules.
 
 The rule supports ranked finite catch-up between joint steps. It does not yet support
 unilateral phases with an unbounded number of iterations that terminate only almost

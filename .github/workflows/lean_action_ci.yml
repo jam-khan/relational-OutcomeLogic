@@ -18,10 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: leanprover/lean-action@v1
-      - name: Check for sorry/admit
-        run: |
-          if grep -rn --include='*.lean' -E '\bsorry\b|\badmit\b' RelationalOutcomeLogic/ RelationalOutcomeLogic.lean; then
-            echo "FAIL: sorry/admit found" >&2
-            exit 1
-          fi
+      - name: Check source structure, proofs, and axioms
+        run: ./scripts/check.sh
       - uses: leanprover-community/docgen-action@v1
